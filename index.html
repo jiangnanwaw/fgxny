@@ -10745,7 +10745,7 @@ async function loadUnchargedDataFromAPI() {
         }
 
         // 调用后端API获取数据
-        const response = await fetch('/api/local/uncharged-terminals');
+        const response = await fetch(`${API_URL}/api/local/uncharged-terminals`);
         const result = await response.json();
 
         if (result.success && result.data) {
@@ -12864,7 +12864,7 @@ function updateUnchargedTable() {
                 let useAvailableDatesAPI = true;
 
                 try {
-                    const datesResponse = await fetch('/api/local/efficiency-available-dates');
+                    const datesResponse = await fetch(`${API_URL}/api/local/efficiency-available-dates`);
 
                     // 检查响应是否为JSON
                     const contentType = datesResponse.headers.get('content-type');
