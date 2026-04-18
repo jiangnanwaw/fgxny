@@ -4584,6 +4584,9 @@
     </div>
 
     <script>
+        // API 配置
+        const API_URL = 'https://fgxny-api.csfh.asia';
+
         // Supabase 配置
         // ⚠️ 重要：必须使用 publishable key（公开密钥），不要使用 secret key（密钥）
         // publishable key 可以在 Supabase 项目的 Settings > API 页面找到
@@ -15274,7 +15277,6 @@ function updateUnchargedTable() {
             }
 
             let tries = 0;
-            const API_URL = 'https://fgxny-api.csfh.asia';
             const API_HEADERS = {
                 'X-LC-Id': '0RRQT8VRdc9scK3XWD3ZrfWu-gzGzoHsz',
                 'X-LC-Key': 'w5k7ze9JvM7JGUY7O5DVeLVA',
