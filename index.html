@@ -9605,8 +9605,8 @@ function initChargingBoardExport() {
         function loadMetricsData(scope = 'all') {
             console.log('[loadMetricsData] 开始加载实时汇总数据...', 'scope:', scope);
 
-            // 使用相对路径调用 API
-            const apiUrl = `/api/local/realtime-summary?scope=${scope}`;
+            // 使用完整 API 地址
+            const apiUrl = `${API_URL}/api/local/realtime-summary?scope=${scope}`;
 
             fetch(apiUrl)
                 .then(response => {
@@ -9759,8 +9759,8 @@ function initChargingBoardExport() {
                 console.log('[用户行为分析] 加载日期:', date);
 
                 // 分别获取四方坪站和高岭站的数据
-                const didiResponse = await fetch(`/api/local/realtime-summary?scope=didi&detailDate=${date}`);
-                const teldResponse = await fetch(`/api/local/realtime-summary?scope=teld&detailDate=${date}`);
+                const didiResponse = await fetch(`${API_URL}/api/local/realtime-summary?scope=didi&detailDate=${date}`);
+                const teldResponse = await fetch(`${API_URL}/api/local/realtime-summary?scope=teld&detailDate=${date}`);
 
                 const didiResult = await didiResponse.json();
                 const teldResult = await teldResponse.json();
@@ -9810,8 +9810,8 @@ function initChargingBoardExport() {
                     const dateKey = today.toISOString().split('T')[0];
 
                     // 分别获取四方坪站和高岭站的数据
-                    const didiResponse = await fetch(`/api/local/realtime-summary?scope=didi`);
-                    const teldResponse = await fetch(`/api/local/realtime-summary?scope=teld`);
+                    const didiResponse = await fetch(`${API_URL}/api/local/realtime-summary?scope=didi`);
+                    const teldResponse = await fetch(`${API_URL}/api/local/realtime-summary?scope=teld`);
 
                     const didiResult = await didiResponse.json();
                     const teldResult = await teldResponse.json();
@@ -12906,7 +12906,7 @@ function updateUnchargedTable() {
                 // 第二步：只加载有数据的日期
                 for (const dateStr of availableDates) {
                     try {
-                        const response = await fetch(`/api/local/efficiency-analysis-daily?date=${dateStr}`);
+                        const response = await fetch(`${API_URL}/api/local/efficiency-analysis-daily?date=${dateStr}`);
                         const result = await response.json();
 
                         if (result.success && result.data) {
@@ -12943,7 +12943,7 @@ function updateUnchargedTable() {
 
                 for (const month of uniqueMonths) {
                     try {
-                        const response = await fetch(`/api/local/efficiency-analysis?month=${month}`);
+                        const response = await fetch(`${API_URL}/api/local/efficiency-analysis?month=${month}`);
                         const result = await response.json();
 
                         if (result.success && result.data) {
