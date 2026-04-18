@@ -1,0 +1,7 @@
+tunnel: ad37cfb0-6510-448f-8afd-0b2e5b7abd80
+credentials-file: C:\Users\Administrator\.cloudflared\ad37cfb0-6510-448f-8afd-0b2e5b7abd80.json
+
+ingress:
+  - hostname: fgxny-api.csfh.asia
+    service: http://localhost:3020
+  - service: http_status:404

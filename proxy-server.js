@@ -208,8 +208,8 @@ async function fetchStationHistory(station, token, range) {
 
 function mapStationName(source) {
     const lowerSource = String(source || '').toLowerCase();
-    if (lowerSource === 'didi') return '长沙飞狐四方坪站';
-    if (lowerSource === 'teld') return '长沙飞狐高岭站';
+    if (lowerSource === 'didi') return '长沙飞狐兴发路站';
+    if (lowerSource === 'teld') return '长沙飞狐锦泰广场站';
     return source || '';
 }
 
@@ -615,7 +615,7 @@ app.get('/api/local/uncharged-terminals', async (req, res) => {
             UNION ALL
 
             SELECT
-                '长沙飞狐高岭站' AS stationName,
+                '长沙飞狐锦泰广场站' AS stationName,
                 terminal_name AS terminalName,
                 last_charge_end_time AS lastEndTime,
                 NOW() AS currentTime
@@ -744,62 +744,56 @@ app.get('/api/local/efficiency-analysis-daily', async (req, res) => {
 
         logToFile(`[经营效率分析-日数据] 开始查询数据 (日期: ${date})`);
 
-        // 查询高岭站数据 (teld_history_summary)
-        const [teldRows] = await mysqlPool.query(
+        // 查询锦泰广场站数据 (jintai_hourly_snapshot) - 按日期汇总
+        const [jintaiRows] = await mysqlPool.query(
             `SELECT
-                total_count,
-                total_electricity,
-                total_service_fee,
-                total_duration
-            FROM teld_history_summary
-            WHERE date = ?`,
+                SUM(order_count) as order_count,
+                SUM(electricity) as electricity,
+                SUM(service_fee) as service_fee,
+                SUM(duration_minutes) as duration_minutes
+            FROM jintai_hourly_snapshot
+            WHERE biz_date = ?
+            GROUP BY biz_date`,
             [date]
         );
 
-        // 查询四方坪站数据 (didi_history_summary)
-        const [didiRows] = await mysqlPool.query(
+        // 查询兴发路站数据 (xfl_hourly_snapshot) - 按日期汇总
+        const [xflRows] = await mysqlPool.query(
             `SELECT
-                order_count,
-                electricity,
-                service_fee,
-                duration_text
-            FROM didi_history_summary
-            WHERE date = ?`,
+                SUM(order_count) as order_count,
+                SUM(electricity) as electricity,
+                SUM(service_fee) as service_fee,
+                SUM(duration_minutes) as duration_minutes
+            FROM xfl_hourly_snapshot
+            WHERE biz_date = ?
+            GROUP BY biz_date`,
             [date]
         );
 
-        const teldData = teldRows[0] || {};
-        const didiData = didiRows[0] || {};
+        const jintaiData = jintaiRows[0] || {};
+        const xflData = xflRows[0] || {};
 
-        // 四方坪站：将duration_text转换为分钟
-        let didiTotalMinutes = 0;
-        if (didiData.duration_text) {
-            // 格式：342小时1分9秒
-            const match = didiData.duration_text.match(/(\d+)小时(\d+)分(\d+)秒/);
-            if (match) {
-                const hours = parseInt(match[1]) || 0;
-                const minutes = parseInt(match[2]) || 0;
-                const seconds = parseInt(match[3]) || 0;
-                didiTotalMinutes = hours * 60 + minutes + seconds / 60;
-            }
-        }
+        // 锦泰广场站：duration_minutes 已经是分钟数
+        const jintaiTotalMinutes = parseFloat(jintaiData.duration_minutes) || 0;
 
-        // 高岭站计算 (36个充电枪)
-        const teldDailyDuration = (teldData.total_duration || 0) / 36;
-        const teldDailyUtilization = (teldDailyDuration / 1440).toFixed(4);  // 返回小数，前端会乘100
-        const teldDailyElectricity = ((teldData.total_electricity || 0) / 36).toFixed(2);
-        const teldDailyRevenue = ((teldData.total_service_fee || 0) / 36).toFixed(2);
-        const teldTotalDuration = teldData.total_duration || 0;
-        const teldAvgPower = teldTotalDuration > 0 ? ((teldData.total_electricity || 0) / (teldTotalDuration / 60)).toFixed(2) : '0.00';
-        const teldDailyOrders = ((teldData.total_count || 0) / 36).toFixed(2);
+        // 兴发路站：duration_minutes 已经是分钟数
+        const xflTotalMinutes = parseFloat(xflData.duration_minutes) || 0;
 
-        // 四方坪站计算 (142个充电枪)
-        const didiDailyDuration = didiTotalMinutes / 142;
-        const didiDailyUtilization = (didiDailyDuration / 1440).toFixed(4);  // 返回小数，前端会乘100
-        const didiDailyElectricity = ((didiData.electricity || 0) / 142).toFixed(2);
-        const didiDailyRevenue = ((didiData.service_fee || 0) / 142).toFixed(2);
-        const didiAvgPower = didiTotalMinutes > 0 ? ((didiData.electricity || 0) / (didiTotalMinutes / 60)).toFixed(2) : '0.00';
-        const didiDailyOrders = ((didiData.order_count || 0) / 142).toFixed(2);
+        // 锦泰广场站计算 (48个充电枪)
+        const jintaiDailyDuration = jintaiTotalMinutes / 48;
+        const jintaiDailyUtilization = (jintaiDailyDuration / 1440).toFixed(4);  // 返回小数，前端会乘100
+        const jintaiDailyElectricity = ((jintaiData.electricity || 0) / 48).toFixed(2);
+        const jintaiDailyRevenue = ((jintaiData.service_fee || 0) / 48).toFixed(2);
+        const jintaiAvgPower = jintaiTotalMinutes > 0 ? ((jintaiData.electricity || 0) / (jintaiTotalMinutes / 60)).toFixed(2) : '0.00';
+        const jintaiDailyOrders = ((jintaiData.order_count || 0) / 48).toFixed(2);
+
+        // 兴发路站计算 (20个充电枪)
+        const xflDailyDuration = xflTotalMinutes / 20;
+        const xflDailyUtilization = (xflDailyDuration / 1440).toFixed(4);  // 返回小数，前端会乘100
+        const xflDailyElectricity = ((xflData.electricity || 0) / 20).toFixed(2);
+        const xflDailyRevenue = ((xflData.service_fee || 0) / 20).toFixed(2);
+        const xflAvgPower = xflTotalMinutes > 0 ? ((xflData.electricity || 0) / (xflTotalMinutes / 60)).toFixed(2) : '0.00';
+        const xflDailyOrders = ((xflData.order_count || 0) / 20).toFixed(2);
 
         const duration = Date.now() - startTime;
         logToFile(`[经营效率分析-日数据] 数据查询成功 (${duration}ms, 日期: ${date})`);
@@ -808,20 +802,20 @@ app.get('/api/local/efficiency-analysis-daily', async (req, res) => {
             success: true,
             data: {
                 gaolin: {
-                    dailyDuration: teldDailyDuration.toFixed(2),
-                    dailyUtilization: teldDailyUtilization,
-                    dailyElectricity: teldDailyElectricity,
-                    dailyRevenue: teldDailyRevenue,
-                    avgPower: teldAvgPower,
-                    dailyOrders: teldDailyOrders
+                    dailyDuration: jintaiDailyDuration.toFixed(2),
+                    dailyUtilization: jintaiDailyUtilization,
+                    dailyElectricity: jintaiDailyElectricity,
+                    dailyRevenue: jintaiDailyRevenue,
+                    avgPower: jintaiAvgPower,
+                    dailyOrders: jintaiDailyOrders
                 },
                 sifangping: {
-                    dailyDuration: didiDailyDuration.toFixed(2),
-                    dailyUtilization: didiDailyUtilization,
-                    dailyElectricity: didiDailyElectricity,
-                    dailyRevenue: didiDailyRevenue,
-                    avgPower: didiAvgPower,
-                    dailyOrders: didiDailyOrders
+                    dailyDuration: xflDailyDuration.toFixed(2),
+                    dailyUtilization: xflDailyUtilization,
+                    dailyElectricity: xflDailyElectricity,
+                    dailyRevenue: xflDailyRevenue,
+                    avgPower: xflAvgPower,
+                    dailyOrders: xflDailyOrders
                 }
             }
         });
@@ -856,20 +850,22 @@ app.get('/api/local/efficiency-analysis', async (req, res) => {
         const [year, monthNum] = month.split('-').map(Number);
         const daysInMonth = new Date(year, monthNum, 0).getDate();
 
-        // 查询高岭站数据 (teld_history_summary)
-        const [teldRows] = await mysqlPool.query(
+        // 查询锦泰广场站数据 (jintai_realtime_summary) - 按月汇总
+        const [jintaiRows] = await mysqlPool.query(
             `SELECT
-                SUM(total_count) as total_count,
-                SUM(total_electricity) as total_electricity,
-                SUM(total_service_fee) as total_service_fee,
-                SUM(total_duration) as total_duration
-            FROM teld_history_summary
-            WHERE DATE_FORMAT(date, '%Y-%m') = ?`,
+                SUM(order_count) as order_count,
+                SUM(electricity) as electricity,
+                SUM(service_fee) as service_fee,
+                SUM(duration_minutes) as total_duration_minutes
+            FROM jintai_realtime_summary
+            WHERE scope = 'jintai'
+            AND granularity = 'day'
+            AND DATE_FORMAT(range_start, '%Y-%m') = ?`,
             [month]
         );
 
-        // 查询四方坪站数据 (didi_history_summary)
-        const [didiRows] = await mysqlPool.query(
+        // 查询兴发路站数据 (xfl_realtime_summary) - 按月汇总
+        const [xflRows] = await mysqlPool.query(
             `SELECT
                 SUM(order_count) as order_count,
                 SUM(electricity) as electricity,
@@ -879,31 +875,33 @@ app.get('/api/local/efficiency-analysis', async (req, res) => {
                     CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(duration_text, '分', 1), '小时', -1) AS UNSIGNED) +
                     CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(duration_text, '秒', 1), '分', -1) AS UNSIGNED) / 60
                 ) as total_duration_minutes
-            FROM didi_history_summary
-            WHERE DATE_FORMAT(date, '%Y-%m') = ?`,
+            FROM xfl_realtime_summary
+            WHERE scope = 'month'
+            AND granularity = 'day'
+            AND DATE_FORMAT(range_start, '%Y-%m') = ?`,
             [month]
         );
 
-        const teldData = teldRows[0] || {};
-        const didiData = didiRows[0] || {};
+        const jintaiData = jintaiRows[0] || {};
+        const xflData = xflRows[0] || {};
 
-        // 高岭站计算 (36个充电枪)
-        const teldDailyDuration = (teldData.total_duration || 0) / daysInMonth / 36;
-        const teldDailyUtilization = (teldDailyDuration / 1440).toFixed(4);  // 返回小数，前端会乘100
-        const teldDailyElectricity = ((teldData.total_electricity || 0) / daysInMonth / 36).toFixed(2);
-        const teldDailyRevenue = ((teldData.total_service_fee || 0) / daysInMonth / 36).toFixed(2);
-        const teldTotalDuration = teldData.total_duration || 0;
-        const teldAvgPower = teldTotalDuration > 0 ? ((teldData.total_electricity || 0) / (teldTotalDuration / 60)).toFixed(2) : '0.00';
-        const teldDailyOrders = ((teldData.total_count || 0) / daysInMonth / 36).toFixed(2);
+        // 锦泰广场站计算 (48个充电枪)
+        const jintaiTotalMinutes = jintaiData.total_duration_minutes || 0;
+        const jintaiDailyDuration = jintaiTotalMinutes / daysInMonth / 48;
+        const jintaiDailyUtilization = (jintaiDailyDuration / 1440).toFixed(4);  // 返回小数，前端会乘100
+        const jintaiDailyElectricity = ((jintaiData.electricity || 0) / daysInMonth / 48).toFixed(2);
+        const jintaiDailyRevenue = ((jintaiData.service_fee || 0) / daysInMonth / 48).toFixed(2);
+        const jintaiAvgPower = jintaiTotalMinutes > 0 ? ((jintaiData.electricity || 0) / (jintaiTotalMinutes / 60)).toFixed(2) : '0.00';
+        const jintaiDailyOrders = ((jintaiData.order_count || 0) / daysInMonth / 48).toFixed(2);
 
-        // 四方坪站计算 (142个充电枪)
-        const didiTotalMinutes = didiData.total_duration_minutes || 0;
-        const didiDailyDuration = didiTotalMinutes / daysInMonth / 142;
-        const didiDailyUtilization = (didiDailyDuration / 1440).toFixed(4);  // 返回小数，前端会乘100
-        const didiDailyElectricity = ((didiData.electricity || 0) / daysInMonth / 142).toFixed(2);
-        const didiDailyRevenue = ((didiData.service_fee || 0) / daysInMonth / 142).toFixed(2);
-        const didiAvgPower = didiTotalMinutes > 0 ? ((didiData.electricity || 0) / (didiTotalMinutes / 60)).toFixed(2) : '0.00';
-        const didiDailyOrders = ((didiData.order_count || 0) / daysInMonth / 142).toFixed(2);
+        // 兴发路站计算 (20个充电枪)
+        const xflTotalMinutes = xflData.total_duration_minutes || 0;
+        const xflDailyDuration = xflTotalMinutes / daysInMonth / 20;
+        const xflDailyUtilization = (xflDailyDuration / 1440).toFixed(4);  // 返回小数，前端会乘100
+        const xflDailyElectricity = ((xflData.electricity || 0) / daysInMonth / 20).toFixed(2);
+        const xflDailyRevenue = ((xflData.service_fee || 0) / daysInMonth / 20).toFixed(2);
+        const xflAvgPower = xflTotalMinutes > 0 ? ((xflData.electricity || 0) / (xflTotalMinutes / 60)).toFixed(2) : '0.00';
+        const xflDailyOrders = ((xflData.order_count || 0) / daysInMonth / 20).toFixed(2);
 
         const duration = Date.now() - startTime;
         logToFile(`[经营效率分析] 数据查询成功 (${duration}ms, 月份: ${month})`);
@@ -912,20 +910,20 @@ app.get('/api/local/efficiency-analysis', async (req, res) => {
             success: true,
             data: {
                 gaolin: {
-                    dailyDuration: teldDailyDuration.toFixed(2),
-                    dailyUtilization: teldDailyUtilization,
-                    dailyElectricity: teldDailyElectricity,
-                    dailyRevenue: teldDailyRevenue,
-                    avgPower: teldAvgPower,
-                    dailyOrders: teldDailyOrders
+                    dailyDuration: jintaiDailyDuration.toFixed(2),
+                    dailyUtilization: jintaiDailyUtilization,
+                    dailyElectricity: jintaiDailyElectricity,
+                    dailyRevenue: jintaiDailyRevenue,
+                    avgPower: jintaiAvgPower,
+                    dailyOrders: jintaiDailyOrders
                 },
                 sifangping: {
-                    dailyDuration: didiDailyDuration.toFixed(2),
-                    dailyUtilization: didiDailyUtilization,
-                    dailyElectricity: didiDailyElectricity,
-                    dailyRevenue: didiDailyRevenue,
-                    avgPower: didiAvgPower,
-                    dailyOrders: didiDailyOrders
+                    dailyDuration: xflDailyDuration.toFixed(2),
+                    dailyUtilization: xflDailyUtilization,
+                    dailyElectricity: xflDailyElectricity,
+                    dailyRevenue: xflDailyRevenue,
+                    avgPower: xflAvgPower,
+                    dailyOrders: xflDailyOrders
                 }
             }
         });
