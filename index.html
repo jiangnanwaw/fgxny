@@ -6897,7 +6897,7 @@
                 body: JSON.stringify({ query: sql })
             };
             
-            fetch(window.location.origin, queryOptions)
+            fetch(API_URL, queryOptions)
                 .then(async response => {
                     if (!response.ok) {
                         let errorText = '';
@@ -7120,7 +7120,7 @@
                 body: JSON.stringify({ query: sql })
             };
             
-            fetch(window.location.origin, queryOptions)
+            fetch(API_URL, queryOptions)
                 .then(async response => {
                     // 检查响应状态
                     if (!response.ok) {
@@ -9894,10 +9894,10 @@ function loadRealtimeData() {
     }
 
     // 使用相对路径，自动使用当前页面的协议和域名
-    const apiUrl = '/api/local/monthly-charge-history';
+    const apiUrl = `${API_URL}/api/local/monthly-charge-history`;
 
     console.log('[loadRealtimeData] 开始加载数据...');
-    console.log('[loadRealtimeData] API URL:', window.location.origin + apiUrl);
+    console.log('[loadRealtimeData] API URL:', apiUrl);
 
     fetch(apiUrl)
         .then(response => {
@@ -13973,7 +13973,7 @@ function updateUnchargedTable() {
                 body: JSON.stringify({ query: query })
             };
             
-            fetch(window.location.origin, queryOptions)
+            fetch(API_URL, queryOptions)
                 .then(response => {
                     
                     if (!response.ok) {
