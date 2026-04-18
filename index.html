@@ -12880,8 +12880,8 @@ function updateUnchargedTable() {
                                 // 统一转换为Date对象，然后格式化为本地日期
                                 const d = new Date(date);
                                 return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                            });
-                            console.log(`[经营效率分析] 获取到 ${availableDates.length} 个可用日期`);
+                            }).slice(0, 30); // 只取最近30天
+                            console.log(`[经营效率分析] 获取到 ${availableDates.length} 个可用日期（已限制为最近30天）`);
                             console.log('[经营效率分析] 日期示例:', availableDates.slice(0, 3));
                         } else {
                             console.warn('[经营效率分析] 获取可用日期失败，回退到传统方式');
@@ -12906,38 +12906,47 @@ function updateUnchargedTable() {
                     }
                 }
 
-                // 第二步：只加载有数据的日期
-                for (const dateStr of availableDates) {
-                    try {
-                        const response = await fetch(`${API_URL}/api/local/efficiency-analysis-daily?date=${dateStr}`);
-                        const result = await response.json();
-
-                        if (result.success && result.data) {
-                            efficiencyData.push({
-                                date: dateStr,
-                                displayDate: dateStr,
-                                type: 'day',
-                                glData: {
-                                    duration: parseFloat(result.data.gaolin.dailyDuration),
-                                    utilization: parseFloat(result.data.gaolin.dailyUtilization),
-                                    energy: parseFloat(result.data.gaolin.dailyElectricity),
-                                    revenue: parseFloat(result.data.gaolin.dailyRevenue),
-                                    power: parseFloat(result.data.gaolin.avgPower),
-                                    times: parseFloat(result.data.gaolin.dailyOrders)
-                                },
-                                sfpData: {
-                                    duration: parseFloat(result.data.sifangping.dailyDuration),
-                                    utilization: parseFloat(result.data.sifangping.dailyUtilization),
-                                    energy: parseFloat(result.data.sifangping.dailyElectricity),
-                                    revenue: parseFloat(result.data.sifangping.dailyRevenue),
-                                    power: parseFloat(result.data.sifangping.avgPower),
-                                    times: parseFloat(result.data.sifangping.dailyOrders)
+                // 第二步：并发加载有数据的日期（每次10个并发）
+                const batchSize = 10;
+                for (let i = 0; i < availableDates.length; i += batchSize) {
+                    const batch = availableDates.slice(i, i + batchSize);
+                    const promises = batch.map(dateStr =>
+                        fetch(`${API_URL}/api/local/efficiency-analysis-daily?date=${dateStr}`)
+                            .then(response => response.json())
+                            .then(result => {
+                                if (result.success && result.data) {
+                                    return {
+                                        date: dateStr,
+                                        displayDate: dateStr,
+                                        type: 'day',
+                                        glData: {
+                                            duration: parseFloat(result.data.gaolin.dailyDuration),
+                                            utilization: parseFloat(result.data.gaolin.dailyUtilization),
+                                            energy: parseFloat(result.data.gaolin.dailyElectricity),
+                                            revenue: parseFloat(result.data.gaolin.dailyRevenue),
+                                            power: parseFloat(result.data.gaolin.avgPower),
+                                            times: parseFloat(result.data.gaolin.dailyOrders)
+                                        },
+                                        sfpData: {
+                                            duration: parseFloat(result.data.sifangping.dailyDuration),
+                                            utilization: parseFloat(result.data.sifangping.dailyUtilization),
+                                            energy: parseFloat(result.data.sifangping.dailyElectricity),
+                                            revenue: parseFloat(result.data.sifangping.dailyRevenue),
+                                            power: parseFloat(result.data.sifangping.avgPower),
+                                            times: parseFloat(result.data.sifangping.dailyOrders)
+                                        }
+                                    };
                                 }
-                            });
-                        }
-                    } catch (error) {
-                        console.error(`[经营效率分析] 加载${dateStr}日数据失败:`, error);
-                    }
+                                return null;
+                            })
+                            .catch(error => {
+                                console.error(`[经营效率分析] 加载${dateStr}日数据失败:`, error);
+                                return null;
+                            })
+                    );
+
+                    const results = await Promise.all(promises);
+                    efficiencyData.push(...results.filter(r => r !== null));
                 }
 
                 // 第三步：生成月数据（从日数据中提取唯一的月份）
