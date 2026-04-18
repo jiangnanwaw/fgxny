@@ -744,56 +744,54 @@ app.get('/api/local/efficiency-analysis-daily', async (req, res) => {
 
         logToFile(`[经营效率分析-日数据] 开始查询数据 (日期: ${date})`);
 
-        // 查询锦泰广场站数据 (jintai_hourly_snapshot) - 按日期汇总
+        // 查询锦泰广场站数据 (jintai_history_summary)
         const [jintaiRows] = await mysqlPool.query(
             `SELECT
-                SUM(order_count) as order_count,
-                SUM(electricity) as electricity,
-                SUM(service_fee) as service_fee,
-                SUM(duration_minutes) as duration_minutes
-            FROM jintai_hourly_snapshot
-            WHERE biz_date = ?
-            GROUP BY biz_date`,
+                total_count,
+                total_electricity,
+                total_service_fee,
+                total_duration
+            FROM jintai_history_summary
+            WHERE date = ?`,
             [date]
         );
 
-        // 查询兴发路站数据 (xfl_hourly_snapshot) - 按日期汇总
+        // 查询兴发路站数据 (xfl_history_summary)
         const [xflRows] = await mysqlPool.query(
             `SELECT
-                SUM(order_count) as order_count,
-                SUM(electricity) as electricity,
-                SUM(service_fee) as service_fee,
-                SUM(duration_minutes) as duration_minutes
-            FROM xfl_hourly_snapshot
-            WHERE biz_date = ?
-            GROUP BY biz_date`,
+                total_count,
+                total_electricity,
+                total_service_fee,
+                total_duration
+            FROM xfl_history_summary
+            WHERE date = ?`,
             [date]
         );
 
         const jintaiData = jintaiRows[0] || {};
         const xflData = xflRows[0] || {};
 
-        // 锦泰广场站：duration_minutes 已经是分钟数
-        const jintaiTotalMinutes = parseFloat(jintaiData.duration_minutes) || 0;
+        // 锦泰广场站：total_duration 已经是分钟数
+        const jintaiTotalMinutes = parseFloat(jintaiData.total_duration) || 0;
 
-        // 兴发路站：duration_minutes 已经是分钟数
-        const xflTotalMinutes = parseFloat(xflData.duration_minutes) || 0;
+        // 兴发路站：total_duration 已经是分钟数
+        const xflTotalMinutes = parseFloat(xflData.total_duration) || 0;
 
         // 锦泰广场站计算 (48个充电枪)
         const jintaiDailyDuration = jintaiTotalMinutes / 48;
         const jintaiDailyUtilization = (jintaiDailyDuration / 1440).toFixed(4);  // 返回小数，前端会乘100
-        const jintaiDailyElectricity = ((jintaiData.electricity || 0) / 48).toFixed(2);
-        const jintaiDailyRevenue = ((jintaiData.service_fee || 0) / 48).toFixed(2);
-        const jintaiAvgPower = jintaiTotalMinutes > 0 ? ((jintaiData.electricity || 0) / (jintaiTotalMinutes / 60)).toFixed(2) : '0.00';
-        const jintaiDailyOrders = ((jintaiData.order_count || 0) / 48).toFixed(2);
+        const jintaiDailyElectricity = ((jintaiData.total_electricity || 0) / 48).toFixed(2);
+        const jintaiDailyRevenue = ((jintaiData.total_service_fee || 0) / 48).toFixed(2);
+        const jintaiAvgPower = jintaiTotalMinutes > 0 ? ((jintaiData.total_electricity || 0) / (jintaiTotalMinutes / 60)).toFixed(2) : '0.00';
+        const jintaiDailyOrders = ((jintaiData.total_count || 0) / 48).toFixed(2);
 
         // 兴发路站计算 (20个充电枪)
         const xflDailyDuration = xflTotalMinutes / 20;
         const xflDailyUtilization = (xflDailyDuration / 1440).toFixed(4);  // 返回小数，前端会乘100
-        const xflDailyElectricity = ((xflData.electricity || 0) / 20).toFixed(2);
-        const xflDailyRevenue = ((xflData.service_fee || 0) / 20).toFixed(2);
-        const xflAvgPower = xflTotalMinutes > 0 ? ((xflData.electricity || 0) / (xflTotalMinutes / 60)).toFixed(2) : '0.00';
-        const xflDailyOrders = ((xflData.order_count || 0) / 20).toFixed(2);
+        const xflDailyElectricity = ((xflData.total_electricity || 0) / 20).toFixed(2);
+        const xflDailyRevenue = ((xflData.total_service_fee || 0) / 20).toFixed(2);
+        const xflAvgPower = xflTotalMinutes > 0 ? ((xflData.total_electricity || 0) / (xflTotalMinutes / 60)).toFixed(2) : '0.00';
+        const xflDailyOrders = ((xflData.total_count || 0) / 20).toFixed(2);
 
         const duration = Date.now() - startTime;
         logToFile(`[经营效率分析-日数据] 数据查询成功 (${duration}ms, 日期: ${date})`);
@@ -850,35 +848,27 @@ app.get('/api/local/efficiency-analysis', async (req, res) => {
         const [year, monthNum] = month.split('-').map(Number);
         const daysInMonth = new Date(year, monthNum, 0).getDate();
 
-        // 查询锦泰广场站数据 (jintai_realtime_summary) - 按月汇总
+        // 查询锦泰广场站数据 (jintai_history_summary) - 按月汇总
         const [jintaiRows] = await mysqlPool.query(
             `SELECT
-                SUM(order_count) as order_count,
-                SUM(electricity) as electricity,
-                SUM(service_fee) as service_fee,
-                SUM(duration_minutes) as total_duration_minutes
-            FROM jintai_realtime_summary
-            WHERE scope = 'jintai'
-            AND granularity = 'day'
-            AND DATE_FORMAT(range_start, '%Y-%m') = ?`,
+                SUM(total_count) as order_count,
+                SUM(total_electricity) as electricity,
+                SUM(total_service_fee) as service_fee,
+                SUM(total_duration) as total_duration_minutes
+            FROM jintai_history_summary
+            WHERE DATE_FORMAT(date, '%Y-%m') = ?`,
             [month]
         );
 
-        // 查询兴发路站数据 (xfl_realtime_summary) - 按月汇总
+        // 查询兴发路站数据 (xfl_history_summary) - 按月汇总
         const [xflRows] = await mysqlPool.query(
             `SELECT
-                SUM(order_count) as order_count,
-                SUM(electricity) as electricity,
-                SUM(service_fee) as service_fee,
-                SUM(
-                    CAST(SUBSTRING_INDEX(duration_text, '小时', 1) AS UNSIGNED) * 60 +
-                    CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(duration_text, '分', 1), '小时', -1) AS UNSIGNED) +
-                    CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(duration_text, '秒', 1), '分', -1) AS UNSIGNED) / 60
-                ) as total_duration_minutes
-            FROM xfl_realtime_summary
-            WHERE scope = 'month'
-            AND granularity = 'day'
-            AND DATE_FORMAT(range_start, '%Y-%m') = ?`,
+                SUM(total_count) as order_count,
+                SUM(total_electricity) as electricity,
+                SUM(total_service_fee) as service_fee,
+                SUM(total_duration) as total_duration_minutes
+            FROM xfl_history_summary
+            WHERE DATE_FORMAT(date, '%Y-%m') = ?`,
             [month]
         );
 
