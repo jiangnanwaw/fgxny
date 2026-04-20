@@ -55,17 +55,45 @@ const dbConfig = {
     requestTimeout: 60000
 };
 
-// MySQL 数据库配置 (用于未充电时长统计)
+// MySQL 数据库配置 (用于所有数据查询)
 const mysqlConfig = {
     host: 'localhost',
     port: 3306,
     user: 'repair_admin',
     password: 'password123',
-    database: 'module_repair_system',
+    database: 'miniprogram_system',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
     connectTimeout: 30000
+};
+
+// 2026年以前历史数据
+const historicalDataBefore2026 = {
+    xfl: {
+        totalCount: 32080,
+        totalIncome: 765055.64,
+        totalElectricityFee: 512861.51,
+        totalServiceFee: 252194.13,
+        totalElectricity: 926332.906,
+        totalDuration: 1371658.43  // 分钟
+    },
+    jintai: {
+        totalCount: 577925,
+        totalIncome: 13183745.68,
+        totalElectricityFee: 8691947.78,
+        totalServiceFee: 4491797.9,
+        totalElectricity: 14197176.69,
+        totalDuration: 25661519  // 分钟
+    },
+    all: {
+        totalCount: 32080 + 577925,
+        totalIncome: 765055.64 + 13183745.68,
+        totalElectricityFee: 512861.51 + 8691947.78,
+        totalServiceFee: 252194.13 + 4491797.9,
+        totalElectricity: 926332.906 + 14197176.69,
+        totalDuration: 1371658.43 + 25661519
+    }
 };
 
 const moduleRepairConfig = {
@@ -238,6 +266,175 @@ function sortHistoryRows(rows) {
     });
 }
 
+// 查询实时汇总数据的辅助函数
+async function queryRealtimeSummary(scope, granularity) {
+    try {
+        let xflData = null;
+        let jintaiData = null;
+
+        // 查询兴发路站数据
+        if (scope === 'all' || scope === 'didi' || scope === 'xfl') {
+            const [xflRows] = await mysqlPool.query(
+                `SELECT * FROM xfl_realtime_summary
+                 WHERE scope = 'all' AND granularity = ?
+                 ORDER BY last_sync_at DESC LIMIT 1`,
+                [granularity]
+            );
+            if (xflRows.length > 0) {
+                const row = xflRows[0];
+                xflData = {
+                    totalCount: row.order_count || 0,
+                    totalIncome: parseFloat(row.order_amount) || 0,
+                    totalElectricityFee: parseFloat(row.electricity_fee) || 0,
+                    totalServiceFee: parseFloat(row.service_fee) || 0,
+                    totalElectricity: parseFloat(row.electricity) || 0,
+                    totalDuration: parseDurationText(row.duration_text) || 0
+                };
+            }
+        }
+
+        // 查询锦泰广场站数据
+        if (scope === 'all' || scope === 'teld' || scope === 'jintai') {
+            const [jintaiRows] = await mysqlPool.query(
+                `SELECT * FROM jintai_realtime_summary
+                 WHERE station_id = 'jintai_station_001' AND granularity = ?
+                 ORDER BY last_sync_at DESC LIMIT 1`,
+                [granularity]
+            );
+            if (jintaiRows.length > 0) {
+                const row = jintaiRows[0];
+                jintaiData = {
+                    totalCount: row.total_count || 0,
+                    totalIncome: parseFloat(row.total_income) || 0,
+                    totalElectricityFee: parseFloat(row.total_electricity_fee) || 0,
+                    totalServiceFee: parseFloat(row.total_service_fee) || 0,
+                    totalElectricity: parseFloat(row.total_electricity) || 0,
+                    totalDuration: row.total_duration || 0
+                };
+            }
+        }
+
+        // 合并数据
+        if (scope === 'all') {
+            return {
+                totalCount: (xflData?.totalCount || 0) + (jintaiData?.totalCount || 0),
+                totalIncome: (xflData?.totalIncome || 0) + (jintaiData?.totalIncome || 0),
+                totalElectricityFee: (xflData?.totalElectricityFee || 0) + (jintaiData?.totalElectricityFee || 0),
+                totalServiceFee: (xflData?.totalServiceFee || 0) + (jintaiData?.totalServiceFee || 0),
+                totalElectricity: (xflData?.totalElectricity || 0) + (jintaiData?.totalElectricity || 0),
+                totalDuration: (xflData?.totalDuration || 0) + (jintaiData?.totalDuration || 0)
+            };
+        } else if (scope === 'didi' || scope === 'xfl') {
+            return xflData || {
+                totalCount: 0,
+                totalIncome: 0,
+                totalElectricityFee: 0,
+                totalServiceFee: 0,
+                totalElectricity: 0,
+                totalDuration: 0
+            };
+        } else {
+            return jintaiData || {
+                totalCount: 0,
+                totalIncome: 0,
+                totalElectricityFee: 0,
+                totalServiceFee: 0,
+                totalElectricity: 0,
+                totalDuration: 0
+            };
+        }
+    } catch (error) {
+        logToFile(`[查询实时汇总] 查询失败: ${error.message}`);
+        throw error;
+    }
+}
+
+// 解析时长文本为分钟数
+function parseDurationText(durationText) {
+    if (!durationText) return 0;
+
+    // 格式：3小时24分10秒 或 109小时53分43秒
+    const match = durationText.match(/(\d+)小时(\d+)分(\d+)秒/);
+    if (match) {
+        const hours = parseInt(match[1]) || 0;
+        const minutes = parseInt(match[2]) || 0;
+        const seconds = parseInt(match[3]) || 0;
+        return hours * 60 + minutes + seconds / 60;
+    }
+    return 0;
+}
+
+// 查询小时明细数据
+async function queryHourlyDetails(scope, date) {
+    try {
+        const rows = [];
+
+        // 查询兴发路站小时数据
+        if (scope === 'all' || scope === 'didi' || scope === 'xfl') {
+            const [xflRows] = await mysqlPool.query(
+                `SELECT * FROM xfl_hourly_snapshot
+                 WHERE biz_date = ? AND scope = 'all'
+                 ORDER BY snapshot_time ASC`,
+                [date]
+            );
+
+            for (const row of xflRows) {
+                const hour = new Date(row.snapshot_time).getHours();
+                if (!rows[hour]) {
+                    rows[hour] = {
+                        hour: hour,
+                        totalElectricity: 0,
+                        totalCount: 0
+                    };
+                }
+                rows[hour].totalElectricity += parseFloat(row.electricity) || 0;
+                rows[hour].totalCount += row.order_count || 0;
+            }
+        }
+
+        // 查询锦泰广场站小时数据
+        if (scope === 'all' || scope === 'teld' || scope === 'jintai') {
+            const [jintaiRows] = await mysqlPool.query(
+                `SELECT * FROM jintai_hourly_snapshot
+                 WHERE biz_date = ? AND station_id = 'jintai_station_001'
+                 ORDER BY snapshot_time ASC`,
+                [date]
+            );
+
+            for (const row of jintaiRows) {
+                const hour = new Date(row.snapshot_time).getHours();
+                if (!rows[hour]) {
+                    rows[hour] = {
+                        hour: hour,
+                        totalElectricity: 0,
+                        totalCount: 0
+                    };
+                }
+                rows[hour].totalElectricity += parseFloat(row.total_electricity) || 0;
+                rows[hour].totalCount += row.total_count || 0;
+            }
+        }
+
+        // 确保返回24小时完整数据
+        const result = [];
+        for (let i = 0; i < 24; i++) {
+            result.push(rows[i] || {
+                hour: i,
+                totalElectricity: 0,
+                totalCount: 0
+            });
+        }
+
+        return {
+            date: date,
+            rows: result
+        };
+    } catch (error) {
+        logToFile(`[查询小时明细] 查询失败: ${error.message}`);
+        throw error;
+    }
+}
+
 // 创建连接池
 let pool = null;
 let mysqlPool = null;
@@ -387,36 +584,67 @@ app.get('/api/local/monthly-charge-history', async (req, res) => {
     const range = getCurrentMonthRange();
 
     try {
-        logToFile(`[历史数据] 开始拉取本月数据 ${range.startDate} ~ ${range.endDate}`);
+        logToFile(`[历史数据] 开始查询本月数据 ${range.startDate} ~ ${range.endDate}`);
 
-        let token = await getReportAuthToken();
-        let didiResult;
-        let teldResult;
-
-        try {
-            [didiResult, teldResult] = await Promise.all([
-                fetchStationHistory('didi', token, range),
-                fetchStationHistory('teld', token, range)
-            ]);
-        } catch (error) {
-            if (error.statusCode === 401) {
-                logToFile('[历史数据] 认证令牌失效，正在刷新后重试');
-                token = await getReportAuthToken(true);
-                [didiResult, teldResult] = await Promise.all([
-                    fetchStationHistory('didi', token, range),
-                    fetchStationHistory('teld', token, range)
-                ]);
-            } else {
-                throw error;
-            }
+        // 确保MySQL连接池存在
+        if (!mysqlPool) {
+            logToFile('初始化MySQL数据库连接...');
+            await initializeMySQLPool();
         }
 
-        const didiRows = Array.isArray(didiResult?.data) ? didiResult.data : [];
-        const teldRows = Array.isArray(teldResult?.data) ? teldResult.data : [];
-        const data = sortHistoryRows(normalizeHistoryRows([...didiRows, ...teldRows]));
-        const duration = Date.now() - startTime;
+        const data = [];
 
-        logToFile(`[历史数据] 本月数据拉取成功 (${duration}ms), 共 ${data.length} 条`);
+        // 查询兴发路站本月历史数据
+        const [xflRows] = await mysqlPool.query(
+            `SELECT date, order_count, order_amount, electricity_fee, service_fee, electricity
+             FROM xfl_history_summary
+             WHERE date >= ? AND date <= ?
+             ORDER BY date DESC`,
+            [range.startDate, range.endDate]
+        );
+
+        for (const row of xflRows) {
+            data.push({
+                date: formatDateForDisplay(row.date),
+                station: '长沙飞狐兴发路站',
+                charge: parseFloat(row.electricity) || 0,
+                totalIncome: parseFloat(row.order_amount) || 0,
+                income: parseFloat(row.service_fee) || 0,
+                orders: row.order_count || 0
+            });
+        }
+
+        // 查询锦泰广场站本月历史数据
+        const [jintaiRows] = await mysqlPool.query(
+            `SELECT date, total_count, total_income, total_electricity_fee, total_service_fee, total_electricity
+             FROM jintai_history_summary
+             WHERE date >= ? AND date <= ?
+             ORDER BY date DESC`,
+            [range.startDate, range.endDate]
+        );
+
+        for (const row of jintaiRows) {
+            data.push({
+                date: formatDateForDisplay(row.date),
+                station: '长沙飞狐锦泰广场站',
+                charge: parseFloat(row.total_electricity) || 0,
+                totalIncome: parseFloat(row.total_income) || 0,
+                income: parseFloat(row.total_service_fee) || 0,
+                orders: row.total_count || 0
+            });
+        }
+
+        // 按日期排序（降序）
+        data.sort((a, b) => {
+            const dateA = a.date.split('-').map(Number);
+            const dateB = b.date.split('-').map(Number);
+            if (dateA[0] !== dateB[0]) return dateB[0] - dateA[0];
+            return dateB[1] - dateA[1];
+        });
+
+        const duration = Date.now() - startTime;
+        logToFile(`[历史数据] 本月数据查询成功 (${duration}ms), 共 ${data.length} 条`);
+
         res.json({
             success: true,
             month: range.month,
@@ -426,7 +654,7 @@ app.get('/api/local/monthly-charge-history', async (req, res) => {
         });
     } catch (err) {
         const duration = Date.now() - startTime;
-        logToFile(`[历史数据] 本月数据拉取失败 (${duration}ms): ${err.message}`);
+        logToFile(`[历史数据] 本月数据查询失败 (${duration}ms): ${err.message}`);
         res.status(500).json({
             success: false,
             message: err.message || '加载本月历史数据失败'
@@ -441,48 +669,49 @@ app.get('/api/local/realtime-summary', async (req, res) => {
     const detailDate = req.query.detailDate; // 可选：指定日期获取小时明细 (yyyy-mm-dd)
 
     try {
-        logToFile(`[实时汇总] 开始拉取实时汇总数据 (站点: ${scope}, 日期: ${detailDate || '今日'})`);
+        logToFile(`[实时汇总] 开始查询实时汇总数据 (站点: ${scope}, 日期: ${detailDate || '今日'})`);
 
-        let token = await getReportAuthToken();
-        let result;
+        // 确保MySQL连接池存在
+        if (!mysqlPool) {
+            logToFile('初始化MySQL数据库连接...');
+            await initializeMySQLPool();
+        }
 
-        const params = { scope: scope };
+        // 查询今日、本月、本年度数据
+        const responseData = {
+            day: null,
+            month: null,
+            year: null
+        };
+
+        // 如果指定了日期，查询该日期的小时明细
         if (detailDate) {
-            params.detailDate = detailDate;
+            const hourlyDetails = await queryHourlyDetails(scope, detailDate);
+            responseData.hourlyDetails = hourlyDetails;
         }
 
-        try {
-            result = await apiRequest('GET', 'reports/realtime-summary', {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                },
-                params: params
-            });
-        } catch (error) {
-            if (error.statusCode === 401) {
-                logToFile('[实时汇总] 认证令牌失效，正在刷新后重试');
-                token = await getReportAuthToken(true);
-                result = await apiRequest('GET', 'reports/realtime-summary', {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    },
-                    params: params
-                });
-            } else {
-                throw error;
-            }
-        }
+        // 查询今日数据
+        const dayData = await queryRealtimeSummary(scope, 'day');
+        responseData.day = dayData;
+
+        // 查询本月数据
+        const monthData = await queryRealtimeSummary(scope, 'month');
+        responseData.month = monthData;
+
+        // 查询本年度数据
+        const yearData = await queryRealtimeSummary(scope, 'year');
+        responseData.year = yearData;
 
         const duration = Date.now() - startTime;
-        logToFile(`[实时汇总] 数据拉取成功 (${duration}ms, 站点: ${scope}, 日期: ${detailDate || '今日'})`);
+        logToFile(`[实时汇总] 数据查询成功 (${duration}ms, 站点: ${scope})`);
 
         res.json({
             success: true,
-            data: result.data
+            data: responseData
         });
     } catch (err) {
         const duration = Date.now() - startTime;
-        logToFile(`[实时汇总] 数据拉取失败 (${duration}ms, 站点: ${scope}, 日期: ${detailDate || '今日'}): ${err.message}`);
+        logToFile(`[实时汇总] 数据查询失败 (${duration}ms, 站点: ${scope}): ${err.message}`);
         res.status(500).json({
             success: false,
             message: err.message || '加载实时汇总数据失败'
@@ -504,66 +733,84 @@ app.get('/api/local/hourly-details', async (req, res) => {
             });
         }
 
-        logToFile(`[小时明细] 开始拉取小时明细数据 (站点: ${scope}, 日期: ${date})`);
+        logToFile(`[小时明细] 开始查询小时明细数据 (站点: ${scope}, 日期: ${date})`);
 
-        let token = await getReportAuthToken();
+        const data = [];
 
-        // 使用 history-detail API 获取指定日期的数据
-        const startDate = date;
-        const endDate = date;
+        // 查询兴发路站数据
+        if (scope === 'all' || scope === 'xfl') {
+            const [xflRows] = await mysqlPool.query(
+                `SELECT
+                    'xfl' as station,
+                    DATE_FORMAT(day_range_start, '%Y-%m-%d %H:00:00') as hour,
+                    order_count,
+                    order_amount,
+                    electricity_fee,
+                    service_fee,
+                    electricity,
+                    duration_text,
+                    duration_minutes
+                FROM xfl_hourly_snapshot
+                WHERE biz_date = ?
+                ORDER BY day_range_start`,
+                [date]
+            );
+            data.push(...xflRows.map(row => ({
+                station: 'xfl',
+                hour: row.hour,
+                orderCount: row.order_count || 0,
+                orderAmount: parseFloat(row.order_amount) || 0,
+                electricityFee: parseFloat(row.electricity_fee) || 0,
+                serviceFee: parseFloat(row.service_fee) || 0,
+                electricity: parseFloat(row.electricity) || 0,
+                durationText: row.duration_text || '',
+                durationMinutes: row.duration_minutes || 0
+            })));
+        }
 
-        let result;
-        try {
-            result = await apiRequest('GET', 'reports/history-detail', {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                },
-                params: {
-                    station: scope === 'all' ? undefined : scope,
-                    startDate: startDate,
-                    endDate: endDate,
-                    limit: 100,
-                    offset: 0,
-                    sortBy: 'date',
-                    sortOrder: 'desc'
-                }
-            });
-        } catch (error) {
-            if (error.statusCode === 401) {
-                logToFile('[小时明细] 认证令牌失效，正在刷新后重试');
-                token = await getReportAuthToken(true);
-                result = await apiRequest('GET', 'reports/history-detail', {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    },
-                    params: {
-                        station: scope === 'all' ? undefined : scope,
-                        startDate: startDate,
-                        endDate: endDate,
-                        limit: 100,
-                        offset: 0,
-                        sortBy: 'date',
-                        sortOrder: 'desc'
-                    }
-                });
-            } else {
-                throw error;
-            }
+        // 查询锦泰广场站数据
+        if (scope === 'all' || scope === 'jintai') {
+            const [jintaiRows] = await mysqlPool.query(
+                `SELECT
+                    'jintai' as station,
+                    DATE_FORMAT(day_range_start, '%Y-%m-%d %H:00:00') as hour,
+                    total_count,
+                    total_income,
+                    total_electricity_fee,
+                    total_service_fee,
+                    total_electricity,
+                    total_duration
+                FROM jintai_hourly_snapshot
+                WHERE biz_date = ?
+                ORDER BY day_range_start`,
+                [date]
+            );
+            data.push(...jintaiRows.map(row => ({
+                station: 'jintai',
+                hour: row.hour,
+                orderCount: row.total_count || 0,
+                orderAmount: parseFloat(row.total_income) || 0,
+                electricityFee: parseFloat(row.total_electricity_fee) || 0,
+                serviceFee: parseFloat(row.total_service_fee) || 0,
+                electricity: parseFloat(row.total_electricity) || 0,
+                durationText: '',
+                durationMinutes: row.total_duration || 0
+            })));
         }
 
         const duration = Date.now() - startTime;
-        logToFile(`[小时明细] 数据拉取成功 (${duration}ms, 站点: ${scope}, 日期: ${date})`);
+        logToFile(`[小时明细] 数据查询成功 (${duration}ms, 站点: ${scope}, 日期: ${date}, 记录数: ${data.length})`);
 
         // 返回数据
         res.json({
             success: true,
             date: date,
             scope: scope,
-            data: result.data || []
+            data: data
         });
     } catch (err) {
         const duration = Date.now() - startTime;
-        logToFile(`[小时明细] 数据拉取失败 (${duration}ms, 站点: ${scope}, 日期: ${date}): ${err.message}`);
+        logToFile(`[小时明细] 数据查询失败 (${duration}ms, 站点: ${scope}, 日期: ${date}): ${err.message}`);
         res.status(500).json({
             success: false,
             message: err.message || '加载小时明细数据失败'
@@ -601,25 +848,25 @@ app.get('/api/local/uncharged-terminals', async (req, res) => {
             await initializeMySQLPool();
         }
 
-        // SQL查询：合并 didi 和 teld 两个表的数据
+        // SQL查询：合并兴发路站和锦泰广场站两个表的数据
         const query = `
             SELECT
                 station_name AS stationName,
                 gun_id AS terminalName,
                 MAX(charge_end_time) AS lastEndTime,
                 NOW() AS currentTime
-            FROM didi_order_detail_3days
+            FROM xingfa_order_detail_3days
             WHERE charge_end_time IS NOT NULL
             GROUP BY station_name, gun_id
 
             UNION ALL
 
             SELECT
-                '长沙飞狐锦泰广场站' AS stationName,
+                station_name AS stationName,
                 terminal_name AS terminalName,
                 last_charge_end_time AS lastEndTime,
                 NOW() AS currentTime
-            FROM teld_terminal_last_charge
+            FROM jintai_terminal_last_charge
             WHERE last_charge_end_time IS NOT NULL
 
             ORDER BY stationName, terminalName
@@ -700,11 +947,11 @@ app.get('/api/local/efficiency-available-dates', async (req, res) => {
 
         // 查询两个表中都有数据的日期（取交集）
         const [rows] = await mysqlPool.query(
-            `SELECT DISTINCT t.date
-            FROM teld_history_summary t
-            INNER JOIN didi_history_summary d ON t.date = d.date
-            WHERE t.date IS NOT NULL
-            ORDER BY t.date DESC
+            `SELECT DISTINCT x.date
+            FROM xfl_history_summary x
+            INNER JOIN jintai_history_summary j ON x.date = j.date
+            WHERE x.date IS NOT NULL
+            ORDER BY x.date DESC
             LIMIT 90`
         );
 
@@ -759,10 +1006,10 @@ app.get('/api/local/efficiency-analysis-daily', async (req, res) => {
         // 查询兴发路站数据 (xfl_history_summary)
         const [xflRows] = await mysqlPool.query(
             `SELECT
-                total_count,
-                total_electricity,
-                total_service_fee,
-                total_duration
+                order_count as total_count,
+                electricity as total_electricity,
+                service_fee as total_service_fee,
+                duration_text
             FROM xfl_history_summary
             WHERE date = ?`,
             [date]
@@ -774,8 +1021,8 @@ app.get('/api/local/efficiency-analysis-daily', async (req, res) => {
         // 锦泰广场站：total_duration 已经是分钟数
         const jintaiTotalMinutes = parseFloat(jintaiData.total_duration) || 0;
 
-        // 兴发路站：total_duration 已经是分钟数
-        const xflTotalMinutes = parseFloat(xflData.total_duration) || 0;
+        // 兴发路站：解析duration_text (格式：109小时53分43秒)
+        const xflTotalMinutes = parseDurationText(xflData.duration_text) || 0;
 
         // 锦泰广场站计算 (48个充电枪)
         const jintaiDailyDuration = jintaiTotalMinutes / 48;
@@ -860,20 +1107,19 @@ app.get('/api/local/efficiency-analysis', async (req, res) => {
             [month]
         );
 
-        // 查询兴发路站数据 (xfl_history_summary) - 按月汇总
+        // 查询兴发路站数据 (xfl_history_summary) - 获取所有行以便累加duration_text
         const [xflRows] = await mysqlPool.query(
             `SELECT
-                SUM(total_count) as order_count,
-                SUM(total_electricity) as electricity,
-                SUM(total_service_fee) as service_fee,
-                SUM(total_duration) as total_duration_minutes
+                order_count,
+                electricity,
+                service_fee,
+                duration_text
             FROM xfl_history_summary
             WHERE DATE_FORMAT(date, '%Y-%m') = ?`,
             [month]
         );
 
         const jintaiData = jintaiRows[0] || {};
-        const xflData = xflRows[0] || {};
 
         // 锦泰广场站计算 (48个充电枪)
         const jintaiTotalMinutes = jintaiData.total_duration_minutes || 0;
@@ -884,14 +1130,24 @@ app.get('/api/local/efficiency-analysis', async (req, res) => {
         const jintaiAvgPower = jintaiTotalMinutes > 0 ? ((jintaiData.electricity || 0) / (jintaiTotalMinutes / 60)).toFixed(2) : '0.00';
         const jintaiDailyOrders = ((jintaiData.order_count || 0) / daysInMonth / 48).toFixed(2);
 
-        // 兴发路站计算 (20个充电枪)
-        const xflTotalMinutes = xflData.total_duration_minutes || 0;
+        // 兴发路站计算 (20个充电枪) - 手动汇总所有数据
+        let xflTotalMinutes = 0;
+        let xflTotalOrders = 0;
+        let xflTotalElectricity = 0;
+        let xflTotalServiceFee = 0;
+
+        for (const row of xflRows) {
+            xflTotalMinutes += parseDurationText(row.duration_text) || 0;
+            xflTotalOrders += row.order_count || 0;
+            xflTotalElectricity += parseFloat(row.electricity) || 0;
+            xflTotalServiceFee += parseFloat(row.service_fee) || 0;
+        }
         const xflDailyDuration = xflTotalMinutes / daysInMonth / 20;
         const xflDailyUtilization = (xflDailyDuration / 1440).toFixed(4);  // 返回小数，前端会乘100
-        const xflDailyElectricity = ((xflData.electricity || 0) / daysInMonth / 20).toFixed(2);
-        const xflDailyRevenue = ((xflData.service_fee || 0) / daysInMonth / 20).toFixed(2);
-        const xflAvgPower = xflTotalMinutes > 0 ? ((xflData.electricity || 0) / (xflTotalMinutes / 60)).toFixed(2) : '0.00';
-        const xflDailyOrders = ((xflData.order_count || 0) / daysInMonth / 20).toFixed(2);
+        const xflDailyElectricity = (xflTotalElectricity / daysInMonth / 20).toFixed(2);
+        const xflDailyRevenue = (xflTotalServiceFee / daysInMonth / 20).toFixed(2);
+        const xflAvgPower = xflTotalMinutes > 0 ? (xflTotalElectricity / (xflTotalMinutes / 60)).toFixed(2) : '0.00';
+        const xflDailyOrders = (xflTotalOrders / daysInMonth / 20).toFixed(2);
 
         const duration = Date.now() - startTime;
         logToFile(`[经营效率分析] 数据查询成功 (${duration}ms, 月份: ${month})`);

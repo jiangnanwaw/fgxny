@@ -3652,8 +3652,8 @@
                     <i class="fas fa-charging-station"></i> 充电数据
                     <select id="charging-station-filter" style="margin-left: 20px; padding: 5px 10px; border-radius: 5px; border: 1px solid #ddd; font-size: 14px; cursor: pointer;">
                         <option value="all">全部站点</option>
-                        <option value="didi">兴发路站</option>
-                        <option value="teld">锦泰广场站</option>
+                        <option value="xfl">兴发路站</option>
+                        <option value="jintai">锦泰广场站</option>
                     </select>
                 </h2>
                 <!-- 充电数据指标板块 -->
@@ -9578,7 +9578,7 @@ function initChargingBoardExport() {
 
         // 2026年以前的历史数据（基础数据）
         const historicalDataBefore2026 = {
-            didi: {
+            xfl: {
                 totalCount: 1221452,
                 totalElectricityFee: 18461833.12,
                 totalServiceFee: 11349464.59,
@@ -9586,7 +9586,7 @@ function initChargingBoardExport() {
                 totalElectricity: 31345046.69,
                 totalDuration: 56521069 // 分钟
             },
-            teld: {
+            jintai: {
                 totalCount: 96455,
                 totalElectricityFee: 1638345.80,
                 totalServiceFee: 596349.27,
@@ -9761,26 +9761,25 @@ function initChargingBoardExport() {
             try {
                 console.log('[用户行为分析] 加载日期:', date);
 
-                // 分别获取兴发路站和锦泰广场站的数据
-                const didiResponse = await fetch(`${API_URL}/api/local/realtime-summary?scope=didi&detailDate=${date}`);
-                const teldResponse = await fetch(`${API_URL}/api/local/realtime-summary?scope=teld&detailDate=${date}`);
-
-                const didiResult = await didiResponse.json();
-                const teldResult = await teldResponse.json();
+                // 获取所有站点的小时明细数据
+                const response = await fetch(`${API_URL}/api/local/hourly-details?scope=all&date=${date}`);
+                const result = await response.json();
 
                 // 提取兴发路站的24小时数据
                 const sfpData = new Array(24).fill(0);
-                if (didiResult.success && didiResult.data.hourlyDetails && didiResult.data.hourlyDetails.rows) {
-                    didiResult.data.hourlyDetails.rows.forEach((row, index) => {
-                        sfpData[index] = row.totalElectricity || 0;
-                    });
-                }
-
                 // 提取锦泰广场站的24小时数据
                 const glData = new Array(24).fill(0);
-                if (teldResult.success && teldResult.data.hourlyDetails && teldResult.data.hourlyDetails.rows) {
-                    teldResult.data.hourlyDetails.rows.forEach((row, index) => {
-                        glData[index] = row.totalElectricity || 0;
+
+                if (result.success && result.data && Array.isArray(result.data)) {
+                    result.data.forEach(row => {
+                        // 提取小时数（0-23）
+                        const hour = new Date(row.hour).getHours();
+
+                        if (row.station === 'xfl') {
+                            sfpData[hour] = row.electricity || 0;
+                        } else if (row.station === 'jintai') {
+                            glData[hour] = row.electricity || 0;
+                        }
                     });
                 }
 
@@ -9812,26 +9811,25 @@ function initChargingBoardExport() {
                     const today = new Date(hourlyDetails.date || new Date());
                     const dateKey = today.toISOString().split('T')[0];
 
-                    // 分别获取兴发路站和锦泰广场站的数据
-                    const didiResponse = await fetch(`${API_URL}/api/local/realtime-summary?scope=didi`);
-                    const teldResponse = await fetch(`${API_URL}/api/local/realtime-summary?scope=teld`);
-
-                    const didiResult = await didiResponse.json();
-                    const teldResult = await teldResponse.json();
+                    // 获取所有站点的小时明细数据
+                    const response = await fetch(`${API_URL}/api/local/hourly-details?scope=all&date=${dateKey}`);
+                    const result = await response.json();
 
                     // 提取兴发路站的24小时数据
                     const sfpData = new Array(24).fill(0);
-                    if (didiResult.success && didiResult.data.hourlyDetails && didiResult.data.hourlyDetails.rows) {
-                        didiResult.data.hourlyDetails.rows.forEach((row, index) => {
-                            sfpData[index] = row.totalElectricity || 0;
-                        });
-                    }
-
                     // 提取锦泰广场站的24小时数据
                     const glData = new Array(24).fill(0);
-                    if (teldResult.success && teldResult.data.hourlyDetails && teldResult.data.hourlyDetails.rows) {
-                        teldResult.data.hourlyDetails.rows.forEach((row, index) => {
-                            glData[index] = row.totalElectricity || 0;
+
+                    if (result.success && result.data && Array.isArray(result.data)) {
+                        result.data.forEach(row => {
+                            // 提取小时数（0-23）
+                            const hour = new Date(row.hour).getHours();
+
+                            if (row.station === 'xfl') {
+                                sfpData[hour] = row.electricity || 0;
+                            } else if (row.station === 'jintai') {
+                                glData[hour] = row.electricity || 0;
+                            }
                         });
                     }
 
