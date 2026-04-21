@@ -61,7 +61,7 @@ const mysqlConfig = {
     port: 3306,
     user: 'repair_admin',
     password: 'password123',
-    database: 'module_repair_system',
+    database: 'miniprogram_system',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
