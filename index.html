@@ -9136,7 +9136,11 @@ let chargingBoardData = [];
 async function loadChargingBoardData() {
     try {
         const stationFilter = document.getElementById('charging-board-station-filter');
+        const yearSelect = document.getElementById('year-select');
         const station = stationFilter ? stationFilter.value : 'all';
+
+        // 保存当前选中的年份
+        const currentYear = yearSelect && yearSelect.dataset.currentYear ? parseInt(yearSelect.dataset.currentYear) : null;
 
         // 从MySQL历史数据表查询数据
         const response = await fetch(`${API_URL}/api/local/charging-board-history?station=${station}`);
@@ -9145,8 +9149,8 @@ async function loadChargingBoardData() {
         if (result.success) {
             chargingBoardData = result.data;
 
-            // 初始化年份选择器（包含初始渲染）
-            initYearSelect();
+            // 初始化年份选择器（包含初始渲染），传入当前年份以保持选中状态
+            initYearSelect(currentYear);
 
             // 初始化站点筛选器事件
             if (stationFilter && !stationFilter.dataset.initialized) {
@@ -9244,7 +9248,7 @@ function extractYear(dateValue) {
 }
 
 // 初始化年份选择器（翻页按钮）
-function initYearSelect() {
+function initYearSelect(preserveYear = null) {
     const yearSelect = document.getElementById('year-select');
     const prevBtn = document.getElementById('year-prev-btn');
     const nextBtn = document.getElementById('year-next-btn');
@@ -9266,11 +9270,17 @@ function initYearSelect() {
     // 将可用年份列表存储到元素上
     yearSelect.dataset.availableYears = JSON.stringify(sortedYears);
 
-    // 设置默认选中当前年份
-    const currentYear = new Date().getFullYear();
-    let initialYear = currentYear;
-    if (!sortedYears.includes(currentYear) && sortedYears.length > 0) {
-        initialYear = sortedYears[sortedYears.length - 1]; // 如果没有当前年份，选择最后一个
+    // 确定要显示的年份：优先使用传入的年份，其次是当前年份，最后是最新年份
+    let initialYear;
+    if (preserveYear && sortedYears.includes(preserveYear)) {
+        initialYear = preserveYear;
+    } else {
+        const currentYear = new Date().getFullYear();
+        if (sortedYears.includes(currentYear)) {
+            initialYear = currentYear;
+        } else if (sortedYears.length > 0) {
+            initialYear = sortedYears[sortedYears.length - 1];
+        }
     }
 
     yearSelect.value = initialYear + '年';
