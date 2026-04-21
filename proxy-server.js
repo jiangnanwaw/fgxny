@@ -508,6 +508,171 @@ app.get('/api/local/monthly-charge-history', async (req, res) => {
     }
 });
 
+// 充电数据看板历史数据接口
+app.get('/api/local/charging-board-history', async (req, res) => {
+    const startTime = Date.now();
+    const station = req.query.station || 'all';
+
+    try {
+        logToFile(`[充电数据看板] 开始查询历史数据 (站点: ${station})`);
+
+        if (!mysqlPool) {
+            throw new Error('MySQL连接池未初始化');
+        }
+
+        let historyQuery = '';
+        let realtimeQuery = '';
+
+        // 2026年3月及之前：从charging_board_history表查询
+        // 2026年4月及之后：从history_summary表查询
+        if (station === 'all') {
+            // 历史数据（2026-03及之前）
+            historyQuery = `
+                SELECT
+                    year,
+                    month,
+                    SUM(electricity) as electricity,
+                    SUM(electricity_fee) as electricity_fee,
+                    SUM(service_fee) as service_fee,
+                    SUM(total_amount) as total_income,
+                    COUNT(*) as order_count,
+                    SUM(duration_minutes) as total_duration
+                FROM (
+                    SELECT year, month, electricity, electricity_fee, service_fee, total_amount, duration_minutes
+                    FROM jintai_charging_board_history
+                    WHERE year < 2026 OR (year = 2026 AND month <= 3)
+                    UNION ALL
+                    SELECT year, month, electricity, electricity_fee, service_fee, total_amount, duration_minutes
+                    FROM xfl_charging_board_history
+                    WHERE year < 2026 OR (year = 2026 AND month <= 3)
+                ) AS combined
+                GROUP BY year, month
+            `;
+
+            // 实时数据（2026-04及之后）
+            realtimeQuery = `
+                SELECT
+                    YEAR(date) as year,
+                    MONTH(date) as month,
+                    SUM(total_electricity) as electricity,
+                    SUM(total_electricity_fee) as electricity_fee,
+                    SUM(total_service_fee) as service_fee,
+                    SUM(total_income) as total_income,
+                    SUM(total_count) as order_count,
+                    SUM(total_duration) as total_duration
+                FROM (
+                    SELECT date, total_electricity, total_electricity_fee, total_service_fee, total_income, total_count, total_duration
+                    FROM jintai_history_summary
+                    WHERE station_id = 'jintai_station_001' AND (YEAR(date) > 2026 OR (YEAR(date) = 2026 AND MONTH(date) >= 4))
+                    UNION ALL
+                    SELECT date, electricity as total_electricity, electricity_fee as total_electricity_fee,
+                           service_fee as total_service_fee, order_amount as total_income, order_count as total_count, 0 as total_duration
+                    FROM xfl_history_summary
+                    WHERE scope = 'all' AND (YEAR(date) > 2026 OR (YEAR(date) = 2026 AND MONTH(date) >= 4))
+                ) AS combined
+                GROUP BY year, month
+            `;
+        } else if (station === 'jintai') {
+            historyQuery = `
+                SELECT
+                    year,
+                    month,
+                    SUM(electricity) as electricity,
+                    SUM(electricity_fee) as electricity_fee,
+                    SUM(service_fee) as service_fee,
+                    SUM(total_amount) as total_income,
+                    COUNT(*) as order_count,
+                    SUM(duration_minutes) as total_duration
+                FROM jintai_charging_board_history
+                WHERE year < 2026 OR (year = 2026 AND month <= 3)
+                GROUP BY year, month
+            `;
+
+            realtimeQuery = `
+                SELECT
+                    YEAR(date) as year,
+                    MONTH(date) as month,
+                    SUM(total_electricity) as electricity,
+                    SUM(total_electricity_fee) as electricity_fee,
+                    SUM(total_service_fee) as service_fee,
+                    SUM(total_income) as total_income,
+                    SUM(total_count) as order_count,
+                    SUM(total_duration) as total_duration
+                FROM jintai_history_summary
+                WHERE station_id = 'jintai_station_001' AND (YEAR(date) > 2026 OR (YEAR(date) = 2026 AND MONTH(date) >= 4))
+                GROUP BY year, month
+            `;
+        } else if (station === 'xfl') {
+            historyQuery = `
+                SELECT
+                    year,
+                    month,
+                    SUM(electricity) as electricity,
+                    SUM(electricity_fee) as electricity_fee,
+                    SUM(service_fee) as service_fee,
+                    SUM(total_amount) as total_income,
+                    COUNT(*) as order_count,
+                    SUM(duration_minutes) as total_duration
+                FROM xfl_charging_board_history
+                WHERE year < 2026 OR (year = 2026 AND month <= 3)
+                GROUP BY year, month
+            `;
+
+            realtimeQuery = `
+                SELECT
+                    YEAR(date) as year,
+                    MONTH(date) as month,
+                    SUM(electricity) as electricity,
+                    SUM(electricity_fee) as electricity_fee,
+                    SUM(service_fee) as service_fee,
+                    SUM(order_amount) as total_income,
+                    SUM(order_count) as order_count,
+                    0 as total_duration
+                FROM xfl_history_summary
+                WHERE scope = 'all' AND (YEAR(date) > 2026 OR (YEAR(date) = 2026 AND MONTH(date) >= 4))
+                GROUP BY year, month
+            `;
+        }
+
+        // 执行两个查询并合并结果
+        const [historyRows] = await mysqlPool.query(historyQuery);
+        const [realtimeRows] = await mysqlPool.query(realtimeQuery);
+
+        const allRows = [...historyRows, ...realtimeRows];
+
+        // 格式化数据
+        const data = allRows.map(row => ({
+            年份: parseInt(row.year),
+            月份: parseInt(row.month),
+            充电量: parseFloat(row.electricity || 0).toFixed(2),
+            充电电费: parseFloat(row.electricity_fee || 0).toFixed(2),
+            充电服务费: parseFloat(row.service_fee || 0).toFixed(2),
+            总收入: parseFloat(row.total_income || 0).toFixed(2),
+            订单数量: parseInt(row.order_count || 0),
+            充电时长: parseInt(row.total_duration || 0)
+        })).sort((a, b) => {
+            if (a.年份 !== b.年份) return a.年份 - b.年份;
+            return a.月份 - b.月份;
+        });
+
+        const duration = Date.now() - startTime;
+        logToFile(`[充电数据看板] 查询成功 (${duration}ms), 共 ${data.length} 条`);
+
+        res.json({
+            success: true,
+            station: station,
+            data: data
+        });
+    } catch (err) {
+        const duration = Date.now() - startTime;
+        logToFile(`[充电数据看板] 查询失败 (${duration}ms): ${err.message}`);
+        res.status(500).json({
+            success: false,
+            message: err.message || '加载充电数据看板历史数据失败'
+        });
+    }
+});
+
 // 实时汇总数据接口（本月、本年度充电数据）
 app.get('/api/local/realtime-summary', async (req, res) => {
     const startTime = Date.now();

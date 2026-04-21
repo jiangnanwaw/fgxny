@@ -4280,6 +4280,11 @@
             <i class="fas fa-table"></i>
             充电数据表格
             <div style="display: flex; align-items: center; margin-left: auto; gap: 10px;">
+                <select id="charging-board-station-filter" style="padding: 5px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; cursor: pointer;">
+                    <option value="all">全部站点</option>
+                    <option value="xfl">兴发路站</option>
+                    <option value="jintai">锦泰广场站</option>
+                </select>
                 <div style="display: flex; align-items: center; gap: 5px; border: 1px solid #ddd; border-radius: 6px; padding: 2px;">
                     <button id="year-prev-btn" style="border: none; background: transparent; cursor: pointer; padding: 5px 8px; font-size: 16px; color: #666;" title="上一年">‹</button>
                     <input type="text" id="year-select" readonly style="padding: 5px 10px; border: none; text-align: center; width: 80px; font-size: 14px; background: transparent; cursor: default;">
@@ -9128,30 +9133,34 @@ function refreshSiteStatsData() {
 let chargingBoardData = [];
 
 // 加载充电数据看板数据
-function loadChargingBoardData() {
-    // 使用缓存管理器加载数据（与loadMetricsData共享缓存）
-    resourceCache.get('https://www.csfhcdz.cn/data/homepage.xlsx')
-        .then(workbook => {
-            
-            // 获取Chargingdata工作表
-            const chargingSheet = workbook.Sheets['Chargingdata'];
-            const jsonData = XLSX.utils.sheet_to_json(chargingSheet, { header: 1 });
-            
-            // 保存表头和数据
-            const headers = jsonData[0];
-            chargingBoardData = jsonData.slice(1).map(row => {
-                let obj = {};
-                headers.forEach((header, index) => {
-                    obj[header] = row[index];
-                });
-                return obj;
-            });
-            
+async function loadChargingBoardData() {
+    try {
+        const stationFilter = document.getElementById('charging-board-station-filter');
+        const station = stationFilter ? stationFilter.value : 'all';
+
+        // 从MySQL历史数据表查询数据
+        const response = await fetch(`${API_URL}/api/local/charging-board-history?station=${station}`);
+        const result = await response.json();
+
+        if (result.success) {
+            chargingBoardData = result.data;
+
             // 初始化年份选择器（包含初始渲染）
             initYearSelect();
-        })
-        .catch(error => {
-        });
+
+            // 初始化站点筛选器事件
+            if (stationFilter && !stationFilter.dataset.initialized) {
+                stationFilter.addEventListener('change', () => {
+                    loadChargingBoardData();
+                });
+                stationFilter.dataset.initialized = 'true';
+            }
+        } else {
+            console.error('加载充电数据看板数据失败:', result.message);
+        }
+    } catch (error) {
+        console.error('加载充电数据看板数据失败:', error);
+    }
 }
 
 // 将时间值转换为Date对象的辅助函数
@@ -9332,92 +9341,53 @@ function updateYearButtons(yearSelect, prevBtn, nextBtn, availableYears) {
 function renderChargingBoardTable(year) {
     const tableBody = document.getElementById('charging-board-table-body');
     tableBody.innerHTML = '';
-    
+
     // 过滤出指定年份的数据
     const yearData = chargingBoardData.filter(item => {
-        if (item['时间']) {
-            const itemYear = extractYear(item['时间']);
-            return itemYear === year;
-        }
-        return false;
+        return item['年份'] === year;
     });
-    
-    // 按时间排序
-    yearData.sort((a, b) => {
-        const dateA = parseTimeToDate(a['时间']);
-        const dateB = parseTimeToDate(b['时间']);
-        if (!dateA && !dateB) return 0;
-        if (!dateA) return 1;
-        if (!dateB) return -1;
-        return dateA.getTime() - dateB.getTime();
-    });
-    
+
+    // 按月份排序
+    yearData.sort((a, b) => a['月份'] - b['月份']);
+
     // 填充数据
     let totalCharge = 0;
     let totalElectricity = 0;
     let totalService = 0;
     let totalIncome = 0;
     let totalOrders = 0;
-    
+
     yearData.forEach(item => {
         const row = document.createElement('tr');
-        
+
         // 格式化时间显示为yyyy-mm
-        let timeDisplay = '';
-        if (item['时间'] instanceof Date) {
-            const date = item['时间'];
-            timeDisplay = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-        } else if (typeof item['时间'] === 'string') {
-            const date = new Date(item['时间']);
-            if (!isNaN(date.getTime())) {
-                timeDisplay = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-            } else {
-                timeDisplay = item['时间'];
-            }
-        } else if (typeof item['时间'] === 'number') {
-            // 处理数字类型：可能是Excel日期序列号或年份
-            if (item['时间'] > 25569) {
-                // 可能是Excel日期序列号
-                const date = new Date((item['时间'] - 25569) * 86400 * 1000);
-                if (!isNaN(date.getTime())) {
-                    timeDisplay = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-                } else {
-                    timeDisplay = item['时间'].toString();
-                }
-            } else if (item['时间'] >= 1900 && item['时间'] <= 2100) {
-                // 如果数字本身就是年份（如2026、2027），显示为年份-01
-                timeDisplay = `${Math.floor(item['时间'])}-01`;
-            } else {
-                timeDisplay = item['时间'].toString();
-            }
-        }
-        
+        const timeDisplay = `${item['年份']}-${String(item['月份']).padStart(2, '0')}`;
+
         row.innerHTML = `
             <td>${timeDisplay}</td>
-            <td>${formatNumber(item['充电量(kwh)'])}</td>
-            <td>${formatNumber(item['充电电费(元)'])}</td>
-            <td>${formatNumber(item['充电服务费(元)'])}</td>
-            <td>${formatNumber(item['充电总收入(元)'])}</td>
-            <td>${formatNumber(item['总订单数量'])}</td>
+            <td>${formatNumber(item['充电量'])}</td>
+            <td>${formatNumber(item['充电电费'])}</td>
+            <td>${formatNumber(item['充电服务费'])}</td>
+            <td>${formatNumber(item['总收入'])}</td>
+            <td>${formatNumber(item['订单数量'])}</td>
         `;
-        
+
         tableBody.appendChild(row);
-        
+
         // 计算合计
-        totalCharge += Number(item['充电量(kwh)']) || 0;
-        totalElectricity += Number(item['充电电费(元)']) || 0;
-        totalService += Number(item['充电服务费(元)']) || 0;
-        totalIncome += Number(item['充电总收入(元)']) || 0;
-        totalOrders += Number(item['总订单数量']) || 0;
+        totalCharge += Number(item['充电量']) || 0;
+        totalElectricity += Number(item['充电电费']) || 0;
+        totalService += Number(item['充电服务费']) || 0;
+        totalIncome += Number(item['总收入']) || 0;
+        totalOrders += Number(item['订单数量']) || 0;
     });
-    
+
     // 添加合计行
     const totalRow = document.createElement('tr');
-    // 为合计行添加样式：背景色和加粗字体
-    totalRow.style.backgroundColor = '#f0f8ff'; // 浅蓝色背景
-    totalRow.style.fontWeight = 'bold'; // 加粗字体
-    totalRow.style.color = '#0066cc'; // 蓝色文字
-    
+    totalRow.style.backgroundColor = '#f0f8ff';
+    totalRow.style.fontWeight = 'bold';
+    totalRow.style.color = '#0066cc';
+
     totalRow.innerHTML = `
         <td>合计</td>
         <td>${formatNumber(totalCharge)}</td>
@@ -9427,7 +9397,7 @@ function renderChargingBoardTable(year) {
         <td>${formatNumber(totalOrders)}</td>
     `;
     tableBody.appendChild(totalRow);
-    
+
     // 渲染图表
     renderChargingBoardChart(yearData);
 }
@@ -9441,50 +9411,14 @@ function renderChargingBoardChart(data) {
         window.chargingBoardChartInstance.destroy();
     }
     
-    // 按时间排序
-    data.sort((a, b) => {
-        const dateA = parseTimeToDate(a['时间']);
-        const dateB = parseTimeToDate(b['时间']);
-        if (!dateA && !dateB) return 0;
-        if (!dateA) return 1;
-        if (!dateB) return -1;
-        return dateA.getTime() - dateB.getTime();
-    });
-    
+    // 按月份排序
+    data.sort((a, b) => a['月份'] - b['月份']);
+
     // 准备图表数据
-    const labels = data.map(item => {
-        if (item['时间'] instanceof Date) {
-            const date = item['时间'];
-            return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-        } else if (typeof item['时间'] === 'string') {
-            const date = new Date(item['时间']);
-            if (!isNaN(date.getTime())) {
-                return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-            } else {
-                return item['时间'];
-            }
-        } else if (typeof item['时间'] === 'number') {
-            // 处理数字类型：可能是Excel日期序列号或年份
-            if (item['时间'] > 25569) {
-                // 可能是Excel日期序列号
-                const date = new Date((item['时间'] - 25569) * 86400 * 1000);
-                if (!isNaN(date.getTime())) {
-                    return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-                } else {
-                    return item['时间'].toString();
-                }
-            } else if (item['时间'] >= 1900 && item['时间'] <= 2100) {
-                // 如果数字本身就是年份（如2026、2027），显示为年份-01
-                return `${Math.floor(item['时间'])}-01`;
-            } else {
-                return item['时间'].toString();
-            }
-        }
-        return '';
-    });
-    
-    const chargeData = data.map(item => Number(item['充电量(kwh)']) || 0);
-    const serviceData = data.map(item => Number(item['充电服务费(元)']) || 0);
+    const labels = data.map(item => `${item['年份']}-${String(item['月份']).padStart(2, '0')}`);
+
+    const chargeData = data.map(item => Number(item['充电量']) || 0);
+    const serviceData = data.map(item => Number(item['充电服务费']) || 0);
     
     // 创建图表
     window.chargingBoardChartInstance = new Chart(ctx, {
@@ -9547,21 +9481,17 @@ function exportChargingBoardData() {
     // 获取当前显示的年份
     const yearSelect = document.getElementById('year-select');
     const year = parseInt(yearSelect.dataset.currentYear || yearSelect.value.replace('年', ''));
-    
+
     // 过滤出指定年份的数据
     const yearData = chargingBoardData.filter(item => {
-        if (item['时间']) {
-            const itemYear = extractYear(item['时间']);
-            return itemYear === year;
-        }
-        return false;
+        return item['年份'] === year;
     });
-    
+
     // 创建一个新的工作簿
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(yearData);
     XLSX.utils.book_append_sheet(wb, ws, '充电数据');
-    
+
     // 导出文件
     XLSX.writeFile(wb, `充电数据_${year}年.xlsx`);
 }
