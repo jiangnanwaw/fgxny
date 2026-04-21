@@ -9248,71 +9248,74 @@ function initYearSelect() {
     const yearSelect = document.getElementById('year-select');
     const prevBtn = document.getElementById('year-prev-btn');
     const nextBtn = document.getElementById('year-next-btn');
-    
+
     // 获取数据中存在的年份
     const years = new Set();
     chargingBoardData.forEach(item => {
-        if (item['时间']) {
-            const year = extractYear(item['时间']);
-            if (year) {
-                years.add(year);
-            }
+        if (item['年份']) {
+            years.add(item['年份']);
         }
     });
-    
+
     // 排序年份
     const sortedYears = Array.from(years).sort((a, b) => a - b);
-    
+
     // 调试信息：输出提取到的年份
     console.log('充电数据表格 - 提取到的年份:', sortedYears);
-    
+
     // 将可用年份列表存储到元素上
     yearSelect.dataset.availableYears = JSON.stringify(sortedYears);
-    
+
     // 设置默认选中当前年份
     const currentYear = new Date().getFullYear();
     let initialYear = currentYear;
     if (!sortedYears.includes(currentYear) && sortedYears.length > 0) {
         initialYear = sortedYears[sortedYears.length - 1]; // 如果没有当前年份，选择最后一个
     }
-    
+
     yearSelect.value = initialYear + '年';
     yearSelect.dataset.currentYear = initialYear;
-    
+
     // 更新按钮状态
     updateYearButtons(yearSelect, prevBtn, nextBtn, sortedYears);
-    
+
     // 初始渲染
     renderChargingBoardTable(initialYear);
-    
-    // 添加翻页按钮事件监听
-    prevBtn.addEventListener('click', function() {
-        const availableYears = JSON.parse(yearSelect.dataset.availableYears);
-        const currentYear = parseInt(yearSelect.dataset.currentYear);
-        const currentIndex = availableYears.indexOf(currentYear);
-        
-        if (currentIndex > 0) {
-            const prevYear = availableYears[currentIndex - 1];
-            yearSelect.value = prevYear + '年';
-            yearSelect.dataset.currentYear = prevYear;
-            updateYearButtons(yearSelect, prevBtn, nextBtn, availableYears);
-            renderChargingBoardTable(prevYear);
-        }
-    });
-    
-    nextBtn.addEventListener('click', function() {
-        const availableYears = JSON.parse(yearSelect.dataset.availableYears);
-        const currentYear = parseInt(yearSelect.dataset.currentYear);
-        const currentIndex = availableYears.indexOf(currentYear);
-        
-        if (currentIndex < availableYears.length - 1) {
-            const nextYear = availableYears[currentIndex + 1];
-            yearSelect.value = nextYear + '年';
-            yearSelect.dataset.currentYear = nextYear;
-            updateYearButtons(yearSelect, prevBtn, nextBtn, availableYears);
-            renderChargingBoardTable(nextYear);
-        }
-    });
+
+    // 添加翻页按钮事件监听（只添加一次）
+    if (!prevBtn.dataset.initialized) {
+        prevBtn.addEventListener('click', function() {
+            const availableYears = JSON.parse(yearSelect.dataset.availableYears);
+            const currentYear = parseInt(yearSelect.dataset.currentYear);
+            const currentIndex = availableYears.indexOf(currentYear);
+
+            if (currentIndex > 0) {
+                const prevYear = availableYears[currentIndex - 1];
+                yearSelect.value = prevYear + '年';
+                yearSelect.dataset.currentYear = prevYear;
+                updateYearButtons(yearSelect, prevBtn, nextBtn, availableYears);
+                renderChargingBoardTable(prevYear);
+            }
+        });
+        prevBtn.dataset.initialized = 'true';
+    }
+
+    if (!nextBtn.dataset.initialized) {
+        nextBtn.addEventListener('click', function() {
+            const availableYears = JSON.parse(yearSelect.dataset.availableYears);
+            const currentYear = parseInt(yearSelect.dataset.currentYear);
+            const currentIndex = availableYears.indexOf(currentYear);
+
+            if (currentIndex < availableYears.length - 1) {
+                const nextYear = availableYears[currentIndex + 1];
+                yearSelect.value = nextYear + '年';
+                yearSelect.dataset.currentYear = nextYear;
+                updateYearButtons(yearSelect, prevBtn, nextBtn, availableYears);
+                renderChargingBoardTable(nextYear);
+            }
+        });
+        nextBtn.dataset.initialized = 'true';
+    }
 }
 
 // 更新年份翻页按钮状态
@@ -9398,28 +9401,33 @@ function renderChargingBoardTable(year) {
     `;
     tableBody.appendChild(totalRow);
 
-    // 渲染图表
-    renderChargingBoardChart(yearData);
+    // 渲染图表 - 显示所有年份的数据趋势
+    renderChargingBoardChart(chargingBoardData);
 }
 
 // 渲染充电数据看板图表
 function renderChargingBoardChart(data) {
     const ctx = document.getElementById('charging-board-chart').getContext('2d');
-    
+
     // 如果已存在图表实例，先销毁它
     if (window.chargingBoardChartInstance) {
         window.chargingBoardChartInstance.destroy();
     }
-    
-    // 按月份排序
-    data.sort((a, b) => a['月份'] - b['月份']);
+
+    // 按年份和月份排序
+    const sortedData = [...data].sort((a, b) => {
+        if (a['年份'] !== b['年份']) {
+            return a['年份'] - b['年份'];
+        }
+        return a['月份'] - b['月份'];
+    });
 
     // 准备图表数据
-    const labels = data.map(item => `${item['年份']}-${String(item['月份']).padStart(2, '0')}`);
+    const labels = sortedData.map(item => `${item['年份']}-${String(item['月份']).padStart(2, '0')}`);
 
-    const chargeData = data.map(item => Number(item['充电量']) || 0);
-    const serviceData = data.map(item => Number(item['充电服务费']) || 0);
-    
+    const chargeData = sortedData.map(item => Number(item['充电量']) || 0);
+    const serviceData = sortedData.map(item => Number(item['充电服务费']) || 0);
+
     // 创建图表
     window.chargingBoardChartInstance = new Chart(ctx, {
         type: 'bar',
