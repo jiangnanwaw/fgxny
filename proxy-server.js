@@ -99,6 +99,16 @@ function parseNumber(value) {
     return Number.isFinite(num) ? num : 0;
 }
 
+// 解析 xfl 的时长文本 "92小时6分15秒" -> 分钟
+function parseDurationText(text) {
+    if (!text) return 0;
+    const hourMatch = text.match(/(\d+)小时/);
+    const minMatch = text.match(/(\d+)分/);
+    const hours = hourMatch ? parseInt(hourMatch[1]) : 0;
+    const mins = minMatch ? parseInt(minMatch[1]) : 0;
+    return hours * 60 + mins;
+}
+
 function getCurrentMonthRange() {
     const now = new Date();
     const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -700,11 +710,11 @@ app.get('/api/local/efficiency-available-dates', async (req, res) => {
 
         // 查询两个表中都有数据的日期（取交集）
         const [rows] = await mysqlPool.query(
-            `SELECT DISTINCT t.date
-            FROM teld_history_summary t
-            INNER JOIN didi_history_summary d ON t.date = d.date
-            WHERE t.date IS NOT NULL
-            ORDER BY t.date DESC
+            `SELECT DISTINCT j.date
+            FROM jintai_history_summary j
+            INNER JOIN xfl_history_summary x ON j.date = x.date
+            WHERE j.date IS NOT NULL
+            ORDER BY j.date DESC
             LIMIT 90`
         );
 
@@ -752,31 +762,40 @@ app.get('/api/local/efficiency-analysis-daily', async (req, res) => {
                 total_service_fee,
                 total_duration
             FROM jintai_history_summary
-            WHERE date = ?`,
+            WHERE date = ? AND station_id = 'jintai_station_001'`,
             [date]
         );
 
         // 查询兴发路站数据 (xfl_history_summary)
         const [xflRows] = await mysqlPool.query(
             `SELECT
-                order_count as total_count,
-                electricity as total_electricity,
-                service_fee as total_service_fee,
-                CAST(SUBSTRING_INDEX(duration_text, ':', 1) AS DECIMAL(10,2)) * 60 +
-                CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(duration_text, ':', 2), ':', -1) AS DECIMAL(10,2)) as total_duration
+                order_count,
+                electricity,
+                service_fee,
+                duration_text
             FROM xfl_history_summary
-            WHERE date = ?`,
+            WHERE date = ? AND scope = 'all'`,
             [date]
         );
 
         const jintaiData = jintaiRows[0] || {};
         const xflData = xflRows[0] || {};
 
+        // 解析 xfl 的时长文本 "92小时6分15秒" -> 分钟
+        function parseDurationText(text) {
+            if (!text) return 0;
+            const hourMatch = text.match(/(\d+)小时/);
+            const minMatch = text.match(/(\d+)分/);
+            const hours = hourMatch ? parseInt(hourMatch[1]) : 0;
+            const mins = minMatch ? parseInt(minMatch[1]) : 0;
+            return hours * 60 + mins;
+        }
+
         // 锦泰广场站：total_duration 已经是分钟数
         const jintaiTotalMinutes = parseFloat(jintaiData.total_duration) || 0;
 
-        // 兴发路站：total_duration 已经是分钟数
-        const xflTotalMinutes = parseFloat(xflData.total_duration) || 0;
+        // 兴发路站：解析 duration_text
+        const xflTotalMinutes = parseDurationText(xflData.duration_text);
 
         // 锦泰广场站计算 (48个充电枪)
         const jintaiDailyDuration = jintaiTotalMinutes / 48;
@@ -789,10 +808,10 @@ app.get('/api/local/efficiency-analysis-daily', async (req, res) => {
         // 兴发路站计算 (20个充电枪)
         const xflDailyDuration = xflTotalMinutes / 20;
         const xflDailyUtilization = (xflDailyDuration / 1440).toFixed(4);  // 返回小数，前端会乘100
-        const xflDailyElectricity = ((xflData.total_electricity || 0) / 20).toFixed(2);
-        const xflDailyRevenue = ((xflData.total_service_fee || 0) / 20).toFixed(2);
-        const xflAvgPower = xflTotalMinutes > 0 ? ((xflData.total_electricity || 0) / (xflTotalMinutes / 60)).toFixed(2) : '0.00';
-        const xflDailyOrders = ((xflData.total_count || 0) / 20).toFixed(2);
+        const xflDailyElectricity = ((xflData.electricity || 0) / 20).toFixed(2);
+        const xflDailyRevenue = ((xflData.service_fee || 0) / 20).toFixed(2);
+        const xflAvgPower = xflData.total_duration_minutes > 0 ? ((xflData.electricity || 0) / (xflData.total_duration_minutes / 60)).toFixed(2) : '0.00';
+        const xflDailyOrders = ((xflData.order_count || 0) / 20).toFixed(2);
 
         const duration = Date.now() - startTime;
         logToFile(`[经营效率分析-日数据] 数据查询成功 (${duration}ms, 日期: ${date})`);
@@ -857,25 +876,42 @@ app.get('/api/local/efficiency-analysis', async (req, res) => {
                 SUM(total_service_fee) as service_fee,
                 SUM(total_duration) as total_duration_minutes
             FROM jintai_history_summary
-            WHERE DATE_FORMAT(date, '%Y-%m') = ?`,
+            WHERE DATE_FORMAT(date, '%Y-%m') = ? AND station_id = 'jintai_station_001'`,
             [month]
         );
 
-        // 查询兴发路站数据 (xfl_history_summary) - 按月汇总
-        const [xflRows] = await mysqlPool.query(
+        // 查询兴发路站数据 (xfl_history_summary) - 需要逐行解析时长
+        const [xflDetailRows] = await mysqlPool.query(
             `SELECT
-                SUM(order_count) as order_count,
-                SUM(electricity) as electricity,
-                SUM(service_fee) as service_fee,
-                SUM(CAST(SUBSTRING_INDEX(duration_text, ':', 1) AS DECIMAL(10,2)) * 60 +
-                    CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(duration_text, ':', 2), ':', -1) AS DECIMAL(10,2))) as total_duration_minutes
+                order_count,
+                electricity,
+                service_fee,
+                duration_text
             FROM xfl_history_summary
-            WHERE DATE_FORMAT(date, '%Y-%m') = ?`,
+            WHERE DATE_FORMAT(date, '%Y-%m') = ? AND scope = 'all'`,
             [month]
         );
+
+        // 解析 xfl 的时长文本并汇总
+        let xflTotalOrders = 0;
+        let xflTotalElectricity = 0;
+        let xflTotalServiceFee = 0;
+        let xflTotalMinutes = 0;
+
+        for (const row of xflDetailRows) {
+            xflTotalOrders += row.order_count || 0;
+            xflTotalElectricity += parseFloat(row.electricity) || 0;
+            xflTotalServiceFee += parseFloat(row.service_fee) || 0;
+            xflTotalMinutes += parseDurationText(row.duration_text);
+        }
 
         const jintaiData = jintaiRows[0] || {};
-        const xflData = xflRows[0] || {};
+        const xflData = {
+            order_count: xflTotalOrders,
+            electricity: xflTotalElectricity,
+            service_fee: xflTotalServiceFee,
+            total_duration_minutes: xflTotalMinutes
+        };
 
         // 锦泰广场站计算 (48个充电枪)
         const jintaiTotalMinutes = jintaiData.total_duration_minutes || 0;
@@ -887,12 +923,11 @@ app.get('/api/local/efficiency-analysis', async (req, res) => {
         const jintaiDailyOrders = ((jintaiData.order_count || 0) / daysInMonth / 48).toFixed(2);
 
         // 兴发路站计算 (20个充电枪)
-        const xflTotalMinutes = xflData.total_duration_minutes || 0;
-        const xflDailyDuration = xflTotalMinutes / daysInMonth / 20;
+        const xflDailyDuration = xflData.total_duration_minutes / daysInMonth / 20;
         const xflDailyUtilization = (xflDailyDuration / 1440).toFixed(4);  // 返回小数，前端会乘100
         const xflDailyElectricity = ((xflData.electricity || 0) / daysInMonth / 20).toFixed(2);
         const xflDailyRevenue = ((xflData.service_fee || 0) / daysInMonth / 20).toFixed(2);
-        const xflAvgPower = xflTotalMinutes > 0 ? ((xflData.electricity || 0) / (xflTotalMinutes / 60)).toFixed(2) : '0.00';
+        const xflAvgPower = xflData.total_duration_minutes > 0 ? ((xflData.electricity || 0) / (xflData.total_duration_minutes / 60)).toFixed(2) : '0.00';
         const xflDailyOrders = ((xflData.order_count || 0) / daysInMonth / 20).toFixed(2);
 
         const duration = Date.now() - startTime;
