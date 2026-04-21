@@ -3853,10 +3853,8 @@
             <div style="display: flex; align-items: center; margin-left: auto; gap: 10px;">
                 <select id="uncharged-station-filter" style="padding: 5px;">
                     <option value="all">全部站点</option>
-                    <option value="长沙飞狐锦泰广场站">长沙飞狐锦泰广场站</option>
-                    <option value="飞狐兴发路东区充电站">飞狐兴发路东区充电站</option>
-                    <option value="飞狐兴发路南区充电站">飞狐兴发路南区充电站</option>
-                    <option value="飞狐兴发路西区充电站">飞狐兴发路西区充电站</option>
+                    <option value="长沙特来电锦泰广场充电站">锦泰广场站</option>
+                    <option value="长沙市岳麓区兴发路充电站">兴发路站</option>
                 </select>
                 <select id="uncharged-duration-filter" style="padding: 5px;">
                     <option value="all">全部时长</option>
@@ -12157,64 +12155,60 @@ function updateUnchargedTable() {
         // 加载行为数据
         async function loadBehaviorData() {
             try {
-                const response = await fetch('https://www.csfhcdz.cn/data/yhxw.xlsx?t=' + new Date().getTime());
-                const data = await response.arrayBuffer();
-                const workbook = XLSX.read(data, { type: 'array' });
-                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }); // 调试用
-
-                // 处理数据 - 按照Excel文件的实际格式加载
                 behaviorData = [];
 
-                // 按照Excel文件格式：A列日期，B列站点，C-Z列24小时数据
-                // 每天占两行：第一行兴发路站，第二行锦泰广场站
-                for (let i = 1; i < jsonData.length; i += 2) {
-                    const dateRow = jsonData[i];      // 兴发路站行
-                    const stationRow = jsonData[i + 1]; // 锦泰广场站行
-                    
-                    if (dateRow && dateRow[0]) {
-                        const dateStr = dateRow[0];
-                        let date;
-                        
-                        // 处理不同的日期格式
-                        if (typeof dateStr === 'number') {
-                            // Excel日期数字格式
-                            date = new Date((dateStr - 25569) * 86400 * 1000);
-                        } else if (typeof dateStr === 'string') {
-                            // 字符串格式
-                            date = new Date(dateStr);
-                        } else {
-                            continue;
-                        }
-
-                        const dateKey = date.toISOString().split('T')[0];
-
-                        // 过滤未来日期：只添加今天及以前的数据
-                        const today = new Date().toISOString().split('T')[0];
-                        if (dateKey > today) {
-                            continue; // 跳过未来日期
-                        }
-
-                        // 从C列开始获取24小时数据（索引2-25）
-                        const sfpData = dateRow.slice(2, 26) || new Array(24).fill(0);
-                        const glData = stationRow ? stationRow.slice(2, 26) : new Array(24).fill(0);
-
-                        // 添加到图表数据（用于翻页和图表显示）
-                        if (!behaviorData.find(d => d.date === dateKey)) {
-                            behaviorData.push({
-                                date: dateKey,
-                                displayDate: dateKey, // 统一使用 yyyy-mm-dd 格式
-                                sfpData: sfpData,
-                                glData: glData
-                            });
-                        }
-                    }
+                // 获取最近30天的日期
+                const today = new Date();
+                const dates = [];
+                for (let i = 29; i >= 0; i--) {
+                    const date = new Date(today);
+                    date.setDate(today.getDate() - i);
+                    dates.push(date.toISOString().split('T')[0]);
                 }
+
+                // 并行加载所有日期的数据
+                const promises = dates.map(async (dateStr) => {
+                    try {
+                        const xflResponse = await fetch(`${API_URL}/api/local/hourly-details?date=${dateStr}&scope=xfl`);
+                        const xflResult = await xflResponse.json();
+
+                        const jintaiResponse = await fetch(`${API_URL}/api/local/hourly-details?date=${dateStr}&scope=jintai`);
+                        const jintaiResult = await jintaiResponse.json();
+
+                        if (xflResult.success && jintaiResult.success) {
+                            // 提取24小时的充电量数据
+                            const xflData = xflResult.data.map(item => item.totalElectricity || 0);
+                            const jintaiData = jintaiResult.data.map(item => item.totalElectricity || 0);
+
+                            // 检查是否有数据（至少有一个小时有充电量）
+                            const hasData = xflData.some(v => v > 0) || jintaiData.some(v => v > 0);
+
+                            if (hasData) {
+                                return {
+                                    date: dateStr,
+                                    displayDate: dateStr,
+                                    sfpData: xflData,      // 兴发路站
+                                    glData: jintaiData     // 锦泰广场站
+                                };
+                            }
+                        }
+                        return null;
+                    } catch (error) {
+                        console.error(`加载 ${dateStr} 数据失败:`, error);
+                        return null;
+                    }
+                });
+
+                // 等待所有请求完成
+                const results = await Promise.all(promises);
+
+                // 过滤掉null值并添加到behaviorData
+                behaviorData = results.filter(item => item !== null);
 
                 // 按日期排序
                 behaviorData.sort((a, b) => new Date(a.date) - new Date(b.date));
-                
-                // 设置当前日期为最大日期
+
+                // 设置当前日期为最新日期
                 if (behaviorData.length > 0) {
                     currentDateIndex = behaviorData.length - 1;
                 }
@@ -12223,6 +12217,7 @@ function updateUnchargedTable() {
                 updateBehaviorButtonStates();
 
             } catch (error) {
+                console.error('加载行为数据失败:', error);
                 // 数据加载失败时也要更新按钮状态
                 updateBehaviorButtonStates();
             }
