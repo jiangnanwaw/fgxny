@@ -694,66 +694,83 @@ app.get('/api/local/hourly-details', async (req, res) => {
             });
         }
 
-        logToFile(`[小时明细] 开始拉取小时明细数据 (站点: ${scope}, 日期: ${date})`);
+        logToFile(`[小时明细] 开始查询小时明细数据 (站点: ${scope}, 日期: ${date})`);
 
-        let token = await getReportAuthToken();
+        // 构建24小时数组（0-23点）
+        const hourlyData = [];
+        for (let hour = 0; hour < 24; hour++) {
+            hourlyData.push({
+                hour: hour,
+                totalCount: 0,
+                totalElectricity: 0,
+                totalIncome: 0,
+                totalDuration: 0
+            });
+        }
 
-        // 使用 history-detail API 获取指定日期的数据
-        const startDate = date;
-        const endDate = date;
+        // 查询锦泰广场站数据
+        if (scope === 'all' || scope === 'jintai') {
+            const [jintaiRows] = await mysqlPool.query(
+                `SELECT HOUR(snapshot_time) as hour,
+                        total_count,
+                        total_electricity,
+                        total_income,
+                        total_duration
+                 FROM jintai_hourly_snapshot
+                 WHERE DATE(snapshot_time) = ?
+                 ORDER BY snapshot_time`,
+                [date]
+            );
 
-        let result;
-        try {
-            result = await apiRequest('GET', 'reports/history-detail', {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                },
-                params: {
-                    station: scope === 'all' ? undefined : scope,
-                    startDate: startDate,
-                    endDate: endDate,
-                    limit: 100,
-                    offset: 0,
-                    sortBy: 'date',
-                    sortOrder: 'desc'
+            jintaiRows.forEach(row => {
+                const hour = parseInt(row.hour);
+                if (hour >= 0 && hour < 24) {
+                    hourlyData[hour].totalCount += parseInt(row.total_count) || 0;
+                    hourlyData[hour].totalElectricity += parseFloat(row.total_electricity) || 0;
+                    hourlyData[hour].totalIncome += parseFloat(row.total_income) || 0;
+                    hourlyData[hour].totalDuration += parseInt(row.total_duration) || 0;
                 }
             });
-        } catch (error) {
-            if (error.statusCode === 401) {
-                logToFile('[小时明细] 认证令牌失效，正在刷新后重试');
-                token = await getReportAuthToken(true);
-                result = await apiRequest('GET', 'reports/history-detail', {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    },
-                    params: {
-                        station: scope === 'all' ? undefined : scope,
-                        startDate: startDate,
-                        endDate: endDate,
-                        limit: 100,
-                        offset: 0,
-                        sortBy: 'date',
-                        sortOrder: 'desc'
-                    }
-                });
-            } else {
-                throw error;
-            }
+        }
+
+        // 查询兴发路站数据
+        if (scope === 'all' || scope === 'xfl') {
+            const [xflRows] = await mysqlPool.query(
+                `SELECT HOUR(snapshot_time) as hour,
+                        order_count,
+                        electricity,
+                        order_amount,
+                        duration_minutes
+                 FROM xfl_hourly_snapshot
+                 WHERE DATE(snapshot_time) = ?
+                 ORDER BY snapshot_time`,
+                [date]
+            );
+
+            xflRows.forEach(row => {
+                const hour = parseInt(row.hour);
+                if (hour >= 0 && hour < 24) {
+                    hourlyData[hour].totalCount += parseInt(row.order_count) || 0;
+                    hourlyData[hour].totalElectricity += parseFloat(row.electricity) || 0;
+                    hourlyData[hour].totalIncome += parseFloat(row.order_amount) || 0;
+                    hourlyData[hour].totalDuration += parseInt(row.duration_minutes) || 0;
+                }
+            });
         }
 
         const duration = Date.now() - startTime;
-        logToFile(`[小时明细] 数据拉取成功 (${duration}ms, 站点: ${scope}, 日期: ${date})`);
+        logToFile(`[小时明细] 数据查询成功 (${duration}ms, 站点: ${scope}, 日期: ${date})`);
 
         // 返回数据
         res.json({
             success: true,
             date: date,
             scope: scope,
-            data: result.data || []
+            data: hourlyData
         });
     } catch (err) {
         const duration = Date.now() - startTime;
-        logToFile(`[小时明细] 数据拉取失败 (${duration}ms, 站点: ${scope}, 日期: ${date}): ${err.message}`);
+        logToFile(`[小时明细] 数据查询失败 (${duration}ms, 站点: ${scope}, 日期: ${date}): ${err.message}`);
         res.status(500).json({
             success: false,
             message: err.message || '加载小时明细数据失败'
@@ -791,25 +808,25 @@ app.get('/api/local/uncharged-terminals', async (req, res) => {
             await initializeMySQLPool();
         }
 
-        // SQL查询：合并 didi 和 teld 两个表的数据
+        // SQL查询：合并兴发路站和锦泰广场站的数据
         const query = `
             SELECT
                 station_name AS stationName,
                 gun_id AS terminalName,
                 MAX(charge_end_time) AS lastEndTime,
                 NOW() AS currentTime
-            FROM didi_order_detail_3days
+            FROM xingfa_order_detail_3days
             WHERE charge_end_time IS NOT NULL
             GROUP BY station_name, gun_id
 
             UNION ALL
 
             SELECT
-                '长沙飞狐锦泰广场站' AS stationName,
+                station_name AS stationName,
                 terminal_name AS terminalName,
                 last_charge_end_time AS lastEndTime,
                 NOW() AS currentTime
-            FROM teld_terminal_last_charge
+            FROM jintai_terminal_last_charge
             WHERE last_charge_end_time IS NOT NULL
 
             ORDER BY stationName, terminalName
@@ -990,7 +1007,7 @@ app.get('/api/local/efficiency-analysis-daily', async (req, res) => {
         const xflDailyUtilization = (xflDailyDuration / 1440).toFixed(4);  // 返回小数，前端会乘100
         const xflDailyElectricity = ((xflData.electricity || 0) / 20).toFixed(2);
         const xflDailyRevenue = ((xflData.service_fee || 0) / 20).toFixed(2);
-        const xflAvgPower = xflData.total_duration_minutes > 0 ? ((xflData.electricity || 0) / (xflData.total_duration_minutes / 60)).toFixed(2) : '0.00';
+        const xflAvgPower = xflTotalMinutes > 0 ? ((xflData.electricity || 0) / (xflTotalMinutes / 60)).toFixed(2) : '0.00';
         const xflDailyOrders = ((xflData.order_count || 0) / 20).toFixed(2);
 
         const duration = Date.now() - startTime;
