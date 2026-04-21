@@ -394,49 +394,101 @@ app.get('/logs', (req, res) => {
 // 本月历史充电数据接口
 app.get('/api/local/monthly-charge-history', async (req, res) => {
     const startTime = Date.now();
-    const range = getCurrentMonthRange();
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const yearMonth = `${year}-${month}`;
+
+    // 计算本月第一天和最后一天
+    const startDate = `${yearMonth}-01`;
+    const lastDay = new Date(year, now.getMonth() + 1, 0).getDate();
+    const endDate = `${yearMonth}-${String(lastDay).padStart(2, '0')}`;
 
     try {
-        logToFile(`[历史数据] 开始拉取本月数据 ${range.startDate} ~ ${range.endDate}`);
+        logToFile(`[历史数据] 开始查询本月数据 ${startDate} ~ ${endDate}`);
 
-        let token = await getReportAuthToken();
-        let didiResult;
-        let teldResult;
+        // 查询锦泰广场站数据
+        const jintaiQuery = `
+            SELECT
+                date,
+                station_id,
+                total_count as orders,
+                total_electricity as charge,
+                total_service_fee as income,
+                total_electricity_fee + total_service_fee as totalIncome
+            FROM jintai_history_summary
+            WHERE DATE_FORMAT(date, '%Y-%m') = ?
+              AND station_id = 'jintai_station_001'
+            ORDER BY date DESC
+        `;
 
-        try {
-            [didiResult, teldResult] = await Promise.all([
-                fetchStationHistory('didi', token, range),
-                fetchStationHistory('teld', token, range)
-            ]);
-        } catch (error) {
-            if (error.statusCode === 401) {
-                logToFile('[历史数据] 认证令牌失效，正在刷新后重试');
-                token = await getReportAuthToken(true);
-                [didiResult, teldResult] = await Promise.all([
-                    fetchStationHistory('didi', token, range),
-                    fetchStationHistory('teld', token, range)
-                ]);
-            } else {
-                throw error;
-            }
-        }
+        // 查询兴发路站数据
+        const xflQuery = `
+            SELECT
+                date,
+                scope,
+                order_count as orders,
+                electricity as charge,
+                service_fee as income,
+                electricity_fee + service_fee as totalIncome
+            FROM xfl_history_summary
+            WHERE DATE_FORMAT(date, '%Y-%m') = ?
+              AND scope = 'all'
+            ORDER BY date DESC
+        `;
 
-        const didiRows = Array.isArray(didiResult?.data) ? didiResult.data : [];
-        const teldRows = Array.isArray(teldResult?.data) ? teldResult.data : [];
-        const data = sortHistoryRows(normalizeHistoryRows([...didiRows, ...teldRows]));
+        const [jintaiRows] = await mysqlPool.query(jintaiQuery, [yearMonth]);
+        const [xflRows] = await mysqlPool.query(xflQuery, [yearMonth]);
+
+        // 格式化数据
+        const data = [];
+
+        // 处理锦泰广场站数据
+        jintaiRows.forEach(row => {
+            const dateStr = row.date.toISOString().split('T')[0];
+            data.push({
+                rawDate: dateStr,
+                date: dateStr.substring(5), // "04-20"
+                stationKey: 'TELD',
+                station: row.station_id,
+                charge: parseFloat(row.charge) || 0,
+                totalIncome: parseFloat(row.totalIncome) || 0,
+                income: parseFloat(row.income) || 0,
+                orders: parseInt(row.orders) || 0
+            });
+        });
+
+        // 处理兴发路站数据
+        xflRows.forEach(row => {
+            const dateStr = row.date.toISOString().split('T')[0];
+            data.push({
+                rawDate: dateStr,
+                date: dateStr.substring(5), // "04-20"
+                stationKey: 'DIDI',
+                station: row.scope,
+                charge: parseFloat(row.charge) || 0,
+                totalIncome: parseFloat(row.totalIncome) || 0,
+                income: parseFloat(row.income) || 0,
+                orders: parseInt(row.orders) || 0
+            });
+        });
+
+        // 按日期降序排序
+        data.sort((a, b) => b.rawDate.localeCompare(a.rawDate));
+
         const duration = Date.now() - startTime;
+        logToFile(`[历史数据] 本月数据查询成功 (${duration}ms), 共 ${data.length} 条`);
 
-        logToFile(`[历史数据] 本月数据拉取成功 (${duration}ms), 共 ${data.length} 条`);
         res.json({
             success: true,
-            month: range.month,
-            startDate: range.startDate,
-            endDate: range.endDate,
+            month: yearMonth,
+            startDate: startDate,
+            endDate: endDate,
             data
         });
     } catch (err) {
         const duration = Date.now() - startTime;
-        logToFile(`[历史数据] 本月数据拉取失败 (${duration}ms): ${err.message}`);
+        logToFile(`[历史数据] 本月数据查询失败 (${duration}ms): ${err.message}`);
         res.status(500).json({
             success: false,
             message: err.message || '加载本月历史数据失败'
