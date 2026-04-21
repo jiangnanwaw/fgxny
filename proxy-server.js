@@ -445,12 +445,18 @@ app.get('/api/local/monthly-charge-history', async (req, res) => {
 
         // 处理锦泰广场站数据
         jintaiRows.forEach(row => {
-            const dateStr = row.date.toISOString().split('T')[0];
+            // 修复时区问题：使用本地日期而不是UTC日期
+            const date = new Date(row.date);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const dateStr = `${year}-${month}-${day}`;
+
             data.push({
                 rawDate: dateStr,
                 date: dateStr.substring(5), // "04-20"
                 stationKey: 'TELD',
-                station: row.station_id,
+                station: '锦泰广场站',
                 charge: parseFloat(row.charge) || 0,
                 totalIncome: parseFloat(row.totalIncome) || 0,
                 income: parseFloat(row.income) || 0,
@@ -460,12 +466,18 @@ app.get('/api/local/monthly-charge-history', async (req, res) => {
 
         // 处理兴发路站数据
         xflRows.forEach(row => {
-            const dateStr = row.date.toISOString().split('T')[0];
+            // 修复时区问题：使用本地日期而不是UTC日期
+            const date = new Date(row.date);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const dateStr = `${year}-${month}-${day}`;
+
             data.push({
                 rawDate: dateStr,
                 date: dateStr.substring(5), // "04-20"
                 stationKey: 'DIDI',
-                station: row.scope,
+                station: '兴发路站',
                 charge: parseFloat(row.charge) || 0,
                 totalIncome: parseFloat(row.totalIncome) || 0,
                 income: parseFloat(row.income) || 0,
@@ -500,51 +512,115 @@ app.get('/api/local/monthly-charge-history', async (req, res) => {
 app.get('/api/local/realtime-summary', async (req, res) => {
     const startTime = Date.now();
     const scope = req.query.scope || 'all'; // 从查询参数获取站点，默认为 'all'
-    const detailDate = req.query.detailDate; // 可选：指定日期获取小时明细 (yyyy-mm-dd)
 
     try {
-        logToFile(`[实时汇总] 开始拉取实时汇总数据 (站点: ${scope}, 日期: ${detailDate || '今日'})`);
+        logToFile(`[实时汇总] 开始查询实时汇总数据 (站点: ${scope})`);
 
-        let token = await getReportAuthToken();
-        let result;
-
-        const params = { scope: scope };
-        if (detailDate) {
-            params.detailDate = detailDate;
+        if (!mysqlPool) {
+            throw new Error('MySQL连接池未初始化');
         }
 
-        try {
-            result = await apiRequest('GET', 'reports/realtime-summary', {
-                headers: {
-                    Authorization: `Bearer ${token}`
+        // 查询锦泰广场站数据
+        const [jintaiRows] = await mysqlPool.query(
+            `SELECT granularity, total_count, total_electricity, total_electricity_fee,
+                    total_service_fee, total_income, total_duration
+             FROM jintai_realtime_summary
+             WHERE station_id = 'jintai_station_001'
+             ORDER BY granularity`
+        );
+
+        // 查询兴发路站数据
+        const [xflRows] = await mysqlPool.query(
+            `SELECT granularity, order_count, electricity, electricity_fee,
+                    service_fee, order_amount, duration_text
+             FROM xfl_realtime_summary
+             WHERE scope = 'all'
+             ORDER BY granularity`
+        );
+
+        // 构建数据结构
+        const jintaiData = {};
+        jintaiRows.forEach(row => {
+            jintaiData[row.granularity] = {
+                totalCount: row.total_count || 0,
+                totalElectricity: parseFloat(row.total_electricity) || 0,
+                totalElectricityFee: parseFloat(row.total_electricity_fee) || 0,
+                totalServiceFee: parseFloat(row.total_service_fee) || 0,
+                totalIncome: parseFloat(row.total_income) || 0,
+                totalDuration: row.total_duration || 0
+            };
+        });
+
+        const xflData = {};
+        xflRows.forEach(row => {
+            // 解析时长文本为分钟数
+            const durationMinutes = parseDurationText(row.duration_text);
+            xflData[row.granularity] = {
+                totalCount: row.order_count || 0,
+                totalElectricity: parseFloat(row.electricity) || 0,
+                totalElectricityFee: parseFloat(row.electricity_fee) || 0,
+                totalServiceFee: parseFloat(row.service_fee) || 0,
+                totalIncome: parseFloat(row.order_amount) || 0,
+                totalDuration: durationMinutes
+            };
+        });
+
+        // 根据scope参数决定返回哪个站点的数据
+        let result;
+        if (scope === 'jintai') {
+            // 只返回锦泰广场站数据
+            result = {
+                day: jintaiData.day || { totalCount: 0, totalElectricity: 0, totalElectricityFee: 0, totalServiceFee: 0, totalIncome: 0, totalDuration: 0 },
+                month: jintaiData.month || { totalCount: 0, totalElectricity: 0, totalElectricityFee: 0, totalServiceFee: 0, totalIncome: 0, totalDuration: 0 },
+                year: jintaiData.year || { totalCount: 0, totalElectricity: 0, totalElectricityFee: 0, totalServiceFee: 0, totalIncome: 0, totalDuration: 0 }
+            };
+        } else if (scope === 'xfl') {
+            // 只返回兴发路站数据
+            result = {
+                day: xflData.day || { totalCount: 0, totalElectricity: 0, totalElectricityFee: 0, totalServiceFee: 0, totalIncome: 0, totalDuration: 0 },
+                month: xflData.month || { totalCount: 0, totalElectricity: 0, totalElectricityFee: 0, totalServiceFee: 0, totalIncome: 0, totalDuration: 0 },
+                year: xflData.year || { totalCount: 0, totalElectricity: 0, totalElectricityFee: 0, totalServiceFee: 0, totalIncome: 0, totalDuration: 0 }
+            };
+        } else {
+            // scope === 'all'，合并两个站点的数据
+            result = {
+                day: {
+                    totalCount: (jintaiData.day?.totalCount || 0) + (xflData.day?.totalCount || 0),
+                    totalElectricity: (jintaiData.day?.totalElectricity || 0) + (xflData.day?.totalElectricity || 0),
+                    totalElectricityFee: (jintaiData.day?.totalElectricityFee || 0) + (xflData.day?.totalElectricityFee || 0),
+                    totalServiceFee: (jintaiData.day?.totalServiceFee || 0) + (xflData.day?.totalServiceFee || 0),
+                    totalIncome: (jintaiData.day?.totalIncome || 0) + (xflData.day?.totalIncome || 0),
+                    totalDuration: (jintaiData.day?.totalDuration || 0) + (xflData.day?.totalDuration || 0)
                 },
-                params: params
-            });
-        } catch (error) {
-            if (error.statusCode === 401) {
-                logToFile('[实时汇总] 认证令牌失效，正在刷新后重试');
-                token = await getReportAuthToken(true);
-                result = await apiRequest('GET', 'reports/realtime-summary', {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    },
-                    params: params
-                });
-            } else {
-                throw error;
-            }
+                month: {
+                    totalCount: (jintaiData.month?.totalCount || 0) + (xflData.month?.totalCount || 0),
+                    totalElectricity: (jintaiData.month?.totalElectricity || 0) + (xflData.month?.totalElectricity || 0),
+                    totalElectricityFee: (jintaiData.month?.totalElectricityFee || 0) + (xflData.month?.totalElectricityFee || 0),
+                    totalServiceFee: (jintaiData.month?.totalServiceFee || 0) + (xflData.month?.totalServiceFee || 0),
+                    totalIncome: (jintaiData.month?.totalIncome || 0) + (xflData.month?.totalIncome || 0),
+                    totalDuration: (jintaiData.month?.totalDuration || 0) + (xflData.month?.totalDuration || 0)
+                },
+                year: {
+                    totalCount: (jintaiData.year?.totalCount || 0) + (xflData.year?.totalCount || 0),
+                    totalElectricity: (jintaiData.year?.totalElectricity || 0) + (xflData.year?.totalElectricity || 0),
+                    totalElectricityFee: (jintaiData.year?.totalElectricityFee || 0) + (xflData.year?.totalElectricityFee || 0),
+                    totalServiceFee: (jintaiData.year?.totalServiceFee || 0) + (xflData.year?.totalServiceFee || 0),
+                    totalIncome: (jintaiData.year?.totalIncome || 0) + (xflData.year?.totalIncome || 0),
+                    totalDuration: (jintaiData.year?.totalDuration || 0) + (xflData.year?.totalDuration || 0)
+                }
+            };
         }
 
         const duration = Date.now() - startTime;
-        logToFile(`[实时汇总] 数据拉取成功 (${duration}ms, 站点: ${scope}, 日期: ${detailDate || '今日'})`);
+        logToFile(`[实时汇总] 数据查询成功 (${duration}ms, 站点: ${scope})`);
 
         res.json({
             success: true,
-            data: result.data
+            data: result
         });
     } catch (err) {
         const duration = Date.now() - startTime;
-        logToFile(`[实时汇总] 数据拉取失败 (${duration}ms, 站点: ${scope}, 日期: ${detailDate || '今日'}): ${err.message}`);
+        logToFile(`[实时汇总] 数据查询失败 (${duration}ms, 站点: ${scope}): ${err.message}`);
         res.status(500).json({
             success: false,
             message: err.message || '加载实时汇总数据失败'
