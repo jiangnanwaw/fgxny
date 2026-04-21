@@ -520,26 +520,64 @@ app.get('/api/local/realtime-summary', async (req, res) => {
             throw new Error('MySQL连接池未初始化');
         }
 
-        // 查询锦泰广场站数据
+        // 查询锦泰广场站今日数据（从hourly_snapshot汇总）
+        const [jintaiDayRows] = await mysqlPool.query(
+            `SELECT SUM(total_count) as total_count,
+                    SUM(total_electricity) as total_electricity,
+                    SUM(total_electricity_fee) as total_electricity_fee,
+                    SUM(total_service_fee) as total_service_fee,
+                    SUM(total_income) as total_income,
+                    SUM(total_duration) as total_duration
+             FROM jintai_hourly_snapshot
+             WHERE station_id = 'jintai_station_001' AND DATE(snapshot_time) = CURDATE()`
+        );
+
+        // 查询锦泰广场站月和年数据
         const [jintaiRows] = await mysqlPool.query(
             `SELECT granularity, total_count, total_electricity, total_electricity_fee,
                     total_service_fee, total_income, total_duration
              FROM jintai_realtime_summary
-             WHERE station_id = 'jintai_station_001'
+             WHERE station_id = 'jintai_station_001' AND granularity IN ('month', 'year')
              ORDER BY granularity`
         );
 
-        // 查询兴发路站数据
+        // 查询兴发路站今日数据（从hourly_snapshot汇总）
+        const [xflDayRows] = await mysqlPool.query(
+            `SELECT SUM(order_count) as order_count,
+                    SUM(electricity) as electricity,
+                    SUM(electricity_fee) as electricity_fee,
+                    SUM(service_fee) as service_fee,
+                    SUM(order_amount) as order_amount,
+                    SUM(duration_minutes) as duration_minutes
+             FROM xfl_hourly_snapshot
+             WHERE scope = 'all' AND DATE(snapshot_time) = CURDATE()`
+        );
+
+        // 查询兴发路站月和年数据
         const [xflRows] = await mysqlPool.query(
             `SELECT granularity, order_count, electricity, electricity_fee,
                     service_fee, order_amount, duration_text
              FROM xfl_realtime_summary
-             WHERE scope = 'all'
+             WHERE scope = 'all' AND granularity IN ('month', 'year')
              ORDER BY granularity`
         );
 
-        // 构建数据结构
+        // 构建锦泰广场站数据结构
         const jintaiData = {};
+
+        // 今日数据
+        if (jintaiDayRows.length > 0 && jintaiDayRows[0].total_count !== null) {
+            jintaiData.day = {
+                totalCount: parseInt(jintaiDayRows[0].total_count) || 0,
+                totalElectricity: parseFloat(jintaiDayRows[0].total_electricity) || 0,
+                totalElectricityFee: parseFloat(jintaiDayRows[0].total_electricity_fee) || 0,
+                totalServiceFee: parseFloat(jintaiDayRows[0].total_service_fee) || 0,
+                totalIncome: parseFloat(jintaiDayRows[0].total_income) || 0,
+                totalDuration: parseInt(jintaiDayRows[0].total_duration) || 0
+            };
+        }
+
+        // 月和年数据
         jintaiRows.forEach(row => {
             jintaiData[row.granularity] = {
                 totalCount: row.total_count || 0,
@@ -551,9 +589,23 @@ app.get('/api/local/realtime-summary', async (req, res) => {
             };
         });
 
+        // 构建兴发路站数据结构
         const xflData = {};
+
+        // 今日数据
+        if (xflDayRows.length > 0 && xflDayRows[0].order_count !== null) {
+            xflData.day = {
+                totalCount: parseInt(xflDayRows[0].order_count) || 0,
+                totalElectricity: parseFloat(xflDayRows[0].electricity) || 0,
+                totalElectricityFee: parseFloat(xflDayRows[0].electricity_fee) || 0,
+                totalServiceFee: parseFloat(xflDayRows[0].service_fee) || 0,
+                totalIncome: parseFloat(xflDayRows[0].order_amount) || 0,
+                totalDuration: parseInt(xflDayRows[0].duration_minutes) || 0
+            };
+        }
+
+        // 月和年数据
         xflRows.forEach(row => {
-            // 解析时长文本为分钟数
             const durationMinutes = parseDurationText(row.duration_text);
             xflData[row.granularity] = {
                 totalCount: row.order_count || 0,
