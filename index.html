@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>长沙峰哥数据管理平台</title>
     <script id="chartjs-cdn" src="https://cdn.bootcdn.net/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" onerror="this.onerror=null; this.src='https://cdn.staticfile.org/Chart.js/4.4.1/chart.umd.min.js'; this.onerror=function(){ this.onerror=null; this.src='https://unpkg.com/chart.js@4.4.1/dist/chart.umd.min.js'; };"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- 引入 Supabase SDK（内嵌） -->
@@ -4588,7 +4589,9 @@
 
     <script>
         // API 配置
-        const API_URL = window.location.origin;
+        const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '192.168.0.166'
+            ? window.location.origin
+            : 'https://fgxny.onrender.com';
 
         // Supabase 配置
         // ⚠️ 重要：必须使用 publishable key（公开密钥），不要使用 secret key（密钥）
@@ -9152,6 +9155,9 @@ async function loadChargingBoardData() {
             // 初始化年份选择器（包含初始渲染），传入当前年份以保持选中状态
             initYearSelect(currentYear);
 
+            // 更新充电数据总趋势图表
+            renderChargingTrendChart();
+
             // 初始化站点筛选器事件
             if (stationFilter && !stationFilter.dataset.initialized) {
                 stationFilter.addEventListener('change', () => {
@@ -9411,8 +9417,8 @@ function renderChargingBoardTable(year) {
     `;
     tableBody.appendChild(totalRow);
 
-    // 渲染图表 - 显示所有年份的数据趋势
-    renderChargingBoardChart(chargingBoardData);
+    // 渲染图表 - 显示当前选中年份的数据趋势
+    renderChargingBoardChart(yearData);
 }
 
 // 渲染充电数据看板图表
@@ -9438,6 +9444,11 @@ function renderChargingBoardChart(data) {
     const chargeData = sortedData.map(item => Number(item['充电量']) || 0);
     const serviceData = sortedData.map(item => Number(item['充电服务费']) || 0);
 
+    // 创建渐变色
+    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, 'rgba(26, 115, 232, 0.8)');
+    gradient.addColorStop(1, 'rgba(26, 115, 232, 0.3)');
+
     // 创建图表
     window.chargingBoardChartInstance = new Chart(ctx, {
         type: 'bar',
@@ -9447,10 +9458,22 @@ function renderChargingBoardChart(data) {
                 {
                     label: '充电量 (kwh)',
                     data: chargeData,
-                    backgroundColor: 'rgba(26, 115, 232, 0.7)',
+                    backgroundColor: gradient,
                     borderColor: 'rgba(26, 115, 232, 1)',
-                    borderWidth: 1,
-                    yAxisID: 'y'
+                    borderWidth: 2,
+                    borderRadius: 6,
+                    yAxisID: 'y',
+                    datalabels: {
+                        display: true,
+                        anchor: 'end',
+                        align: 'top',
+                        formatter: (value) => value.toLocaleString('zh-CN', { maximumFractionDigits: 0 }),
+                        color: '#1a73e8',
+                        font: {
+                            weight: 'bold',
+                            size: 10
+                        }
+                    }
                 },
                 {
                     label: '充电服务费 (元)',
@@ -9458,15 +9481,81 @@ function renderChargingBoardChart(data) {
                     type: 'line',
                     borderColor: 'rgba(0, 200, 83, 1)',
                     backgroundColor: 'rgba(0, 200, 83, 0.1)',
-                    borderWidth: 2,
+                    borderWidth: 3,
                     fill: false,
-                    yAxisID: 'y1'
+                    tension: 0.4,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    pointBackgroundColor: 'rgba(0, 200, 83, 1)',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointHoverBackgroundColor: 'rgba(0, 200, 83, 1)',
+                    pointHoverBorderColor: '#fff',
+                    yAxisID: 'y1',
+                    datalabels: {
+                        display: true,
+                        anchor: 'end',
+                        align: 'top',
+                        formatter: (value) => value.toLocaleString('zh-CN', { maximumFractionDigits: 2 }),
+                        color: '#00c853',
+                        font: {
+                            weight: 'bold',
+                            size: 10
+                        }
+                    }
                 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 15,
+                        font: {
+                            size: 13
+                        }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    padding: 12,
+                    titleFont: {
+                        size: 14,
+                        weight: 'bold'
+                    },
+                    bodyFont: {
+                        size: 13
+                    },
+                    bodySpacing: 6,
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== null) {
+                                label += context.parsed.y.toLocaleString('zh-CN', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2
+                                });
+                            }
+                            return label;
+                        }
+                    }
+                },
+                datalabels: {
+                    display: false
+                }
+            },
             scales: {
                 y: {
                     type: 'linear',
@@ -9474,7 +9563,25 @@ function renderChargingBoardChart(data) {
                     position: 'left',
                     title: {
                         display: true,
-                        text: '充电量 (kwh)'
+                        text: '充电量 (kwh)',
+                        font: {
+                            size: 13,
+                            weight: 'bold'
+                        },
+                        color: '#1a73e8'
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)',
+                        drawBorder: false,
+                        lineWidth: 1
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString('zh-CN');
+                        },
+                        font: {
+                            size: 11
+                        }
                     }
                 },
                 y1: {
@@ -9483,15 +9590,73 @@ function renderChargingBoardChart(data) {
                     position: 'right',
                     title: {
                         display: true,
-                        text: '充电服务费 (元)'
+                        text: '充电服务费 (元)',
+                        font: {
+                            size: 13,
+                            weight: 'bold'
+                        },
+                        color: '#00c853'
                     },
                     grid: {
                         drawOnChartArea: false,
                     },
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString('zh-CN');
+                        },
+                        font: {
+                            size: 11
+                        }
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        font: {
+                            size: 11
+                        }
+                    }
                 }
+            },
+            animation: {
+                duration: 1000,
+                easing: 'easeInOutQuart'
             }
         }
     });
+}
+
+// 渲染充电数据总趋势图表（按年度汇总）
+function renderChargingTrendChart() {
+    // 按年份汇总数据
+    const yearlyData = {};
+    chargingBoardData.forEach(item => {
+        const year = item['年份'];
+        if (!yearlyData[year]) {
+            yearlyData[year] = {
+                充电量: 0,
+                充电服务费: 0
+            };
+        }
+        yearlyData[year].充电量 += Number(item['充电量']) || 0;
+        yearlyData[year].充电服务费 += Number(item['充电服务费']) || 0;
+    });
+
+    // 排序年份并准备图表数据
+    const years = Object.keys(yearlyData).sort((a, b) => a - b);
+    const labels = years.map(y => y + '年');
+    const chargingData = years.map(y => yearlyData[y].充电量);
+    const serviceIncomeData = years.map(y => yearlyData[y].充电服务费);
+
+    // 更新图表
+    if (chargingTrendChart) {
+        chargingTrendChart.data.labels = labels;
+        chargingTrendChart.data.datasets[0].data = chargingData;
+        chargingTrendChart.data.datasets[1].data = serviceIncomeData;
+        chargingTrendChart.update();
+    }
 }
 
 // 导出充电数据看板数据
@@ -10202,34 +10367,6 @@ async function loadIncomeDashboardData() {
         // 加载当前年份数据
         const currentYear = new Date().getFullYear();
         loadYearData(currentYear.toString());
-
-                    // 处理充电数据总趋势图表数据（csdjzqs工作表）
-if (workbook.SheetNames.includes('csdjzqs')) {
-    const csdjzqsSheet = workbook.Sheets['csdjzqs'];
-    const csdjzqsJson = XLSX.utils.sheet_to_json(csdjzqsSheet, { header: 1 });
-
-    // 提取数据
-    const labels = [];
-    const chargingData = [];
-    const serviceIncomeData = [];
-
-    for (let i = 1; i < csdjzqsJson.length; i++) {
-        const row = csdjzqsJson[i];
-        if (row && row.length >= 3) {
-            labels.push(row[0]); // 年份
-            chargingData.push(row[1]); // 充电量
-            serviceIncomeData.push(row[2]); // 服务费收入
-        }
-    }
-
-    // 更新充电数据总趋势图表
-    if (chargingTrendChart) {
-        chargingTrendChart.data.labels = labels;
-        chargingTrendChart.data.datasets[0].data = chargingData;
-        chargingTrendChart.data.datasets[1].data = serviceIncomeData;
-        chargingTrendChart.update();
-    }
-}
 
                 // 处理年度总收入趋势图表数据（ndzsrqs工作表）
 if (workbook.SheetNames.includes('ndzsrqs')) {
@@ -12581,10 +12718,10 @@ function updateUnchargedTable() {
                     datasets: [{
                         data: data,
                         backgroundColor: [
-                            '#ff6b6b', '#ffa726', '#66bb6a', '#42a5f5' // 兴发路站：尖峰平谷
+                            '#ff6b6b', '#ffa726', '#66bb6a', '#42a5f5'
                         ],
                         borderColor: [
-                            '#d32f2f', '#f57c00', '#388e3c', '#1976d2' // 兴发路站：尖峰平谷
+                            '#d32f2f', '#f57c00', '#388e3c', '#1976d2'
                         ],
                         borderWidth: 2
                     }]
@@ -12616,9 +12753,22 @@ function updateUnchargedTable() {
                             enabled: false
                         }
                     },
-                    cutout: '50%' // 空心饼图
+                    cutout: '50%'
                 }
             });
+
+            // 更新数字显示
+            document.getElementById('sfp-jian-number').textContent = electricityData.sfp.jian.toFixed(2);
+            document.getElementById('sfp-jian-percent').textContent = '(' + (total > 0 ? (electricityData.sfp.jian / total * 100).toFixed(1) : 0) + '%)';
+
+            document.getElementById('sfp-feng-number').textContent = electricityData.sfp.feng.toFixed(2);
+            document.getElementById('sfp-feng-percent').textContent = '(' + (total > 0 ? (electricityData.sfp.feng / total * 100).toFixed(1) : 0) + '%)';
+
+            document.getElementById('sfp-ping-number').textContent = electricityData.sfp.ping.toFixed(2);
+            document.getElementById('sfp-ping-percent').textContent = '(' + (total > 0 ? (electricityData.sfp.ping / total * 100).toFixed(1) : 0) + '%)';
+
+            document.getElementById('sfp-gu-number').textContent = electricityData.sfp.gu.toFixed(2);
+            document.getElementById('sfp-gu-percent').textContent = '(' + (total > 0 ? (electricityData.sfp.gu / total * 100).toFixed(1) : 0) + '%)';
         }
 
         // 更新锦泰广场站尖峰平谷饼图
@@ -12649,10 +12799,10 @@ function updateUnchargedTable() {
                     datasets: [{
                         data: data,
                         backgroundColor: [
-                            '#e57373', '#ffb74d', '#81c784', '#64b5f6' // 锦泰广场站：尖峰平谷
+                            '#e57373', '#ffb74d', '#81c784', '#64b5f6'
                         ],
                         borderColor: [
-                            '#c62828', '#ef6c00', '#2e7d32', '#1565c0' // 锦泰广场站：尖峰平谷
+                            '#c62828', '#ef6c00', '#2e7d32', '#1565c0'
                         ],
                         borderWidth: 2
                     }]
@@ -12684,9 +12834,22 @@ function updateUnchargedTable() {
                             enabled: false
                         }
                     },
-                    cutout: '50%' // 空心饼图
+                    cutout: '50%'
                 }
             });
+
+            // 更新数字显示
+            document.getElementById('gl-jian-number').textContent = electricityData.gl.jian.toFixed(2);
+            document.getElementById('gl-jian-percent').textContent = '(' + (total > 0 ? (electricityData.gl.jian / total * 100).toFixed(1) : 0) + '%)';
+
+            document.getElementById('gl-feng-number').textContent = electricityData.gl.feng.toFixed(2);
+            document.getElementById('gl-feng-percent').textContent = '(' + (total > 0 ? (electricityData.gl.feng / total * 100).toFixed(1) : 0) + '%)';
+
+            document.getElementById('gl-ping-number').textContent = electricityData.gl.ping.toFixed(2);
+            document.getElementById('gl-ping-percent').textContent = '(' + (total > 0 ? (electricityData.gl.ping / total * 100).toFixed(1) : 0) + '%)';
+
+            document.getElementById('gl-gu-number').textContent = electricityData.gl.gu.toFixed(2);
+            document.getElementById('gl-gu-percent').textContent = '(' + (total > 0 ? (electricityData.gl.gu / total * 100).toFixed(1) : 0) + '%)';
         }
 
 
