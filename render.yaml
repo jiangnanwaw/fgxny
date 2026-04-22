@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: fgxny-backend
+    env: node
+    buildCommand: npm install
+    startCommand: node proxy-server.js
+    envVars:
+      - key: PORT
+        value: 3020
+      - key: MYSQL_HOST
+        value: csfhcdz.f3322.net
+      - key: MYSQL_PORT
+        value: 3306
+      - key: MYSQL_USER
+        value: external_user
+      - key: MYSQL_PASSWORD
+        sync: false
+      - key: MYSQL_DATABASE
+        value: miniprogram_system
+      - key: SQLSERVER_HOST
+        value: csfhcdz.f3322.net
+      - key: SQLSERVER_PORT
+        value: 1433
+      - key: SQLSERVER_DATABASE
+        value: chargingdata
+      - key: SQLSERVER_USER
+        value: csfh
+      - key: SQLSERVER_PASSWORD
+        sync: false

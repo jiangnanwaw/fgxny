@@ -8,7 +8,7 @@ const https = require('https');
 const wechatLogin = require('./wechat-login');
 
 const app = express();
-const PORT = 3020;
+const PORT = process.env.PORT || 3020;
 
 // 启用CORS以允许前端访问
 app.use(cors());
@@ -36,11 +36,11 @@ function logToFile(message) {
 
 // SQL Server 数据库配置 (使用端口方式连接)
 const dbConfig = {
-    server: 'csfhcdz.f3322.net',
-    port: 1433,
-    database: 'chargingdata',
-    user: 'csfh',
-    password: 'fh123456',
+    server: process.env.SQLSERVER_HOST || 'csfhcdz.f3322.net',
+    port: parseInt(process.env.SQLSERVER_PORT || '1433'),
+    database: process.env.SQLSERVER_DATABASE || 'chargingdata',
+    user: process.env.SQLSERVER_USER || 'csfh',
+    password: process.env.SQLSERVER_PASSWORD || 'fh123456',
     options: {
         encrypt: false, // SQL Server 2008 R2 不需要加密
         trustServerCertificate: true,
@@ -57,11 +57,11 @@ const dbConfig = {
 
 // MySQL 数据库配置 (用于未充电时长统计)
 const mysqlConfig = {
-    host: 'localhost',
-    port: 3306,
-    user: 'repair_admin',
-    password: 'password123',
-    database: 'miniprogram_system',
+    host: process.env.MYSQL_HOST || 'localhost',
+    port: parseInt(process.env.MYSQL_PORT || '3306'),
+    user: process.env.MYSQL_USER || 'repair_admin',
+    password: process.env.MYSQL_PASSWORD || 'password123',
+    database: process.env.MYSQL_DATABASE || 'miniprogram_system',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
