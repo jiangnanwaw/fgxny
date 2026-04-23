@@ -1,0 +1,5 @@
+后端API /api/local/charging-board-history 现在支持两个数据源：
+    - 2026年3月及之前：从 jintai_charging_board_history 和 xfl_charging_board_history 表查询
+    - 2026年4月及之后：从 jintai_history_summary 和 xfl_history_summary 表查询
+  2. 数据自动合并并按年月排序，返回69条历史记录
+  3. 前端页面的加载和渲染逻辑保持不变，自动适配新的数据格式

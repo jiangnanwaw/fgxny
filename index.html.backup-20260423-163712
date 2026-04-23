@@ -9741,9 +9741,9 @@ function initChargingBoardExport() {
 
                     // 格式化时长（分钟转为小时）
                     function formatDuration(minutes) {
-                        if (!minutes) return '0.00小时';
-                        const hours = (minutes / 60).toFixed(2);
-                        return parseFloat(hours).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '小时';
+                        if (!minutes) return '0小时';
+                        const hours = Math.round(minutes / 60);
+                        return formatNumber(hours) + '小时';
                     }
 
                     // 更新今日数据
@@ -9752,7 +9752,7 @@ function initChargingBoardExport() {
                         document.getElementById('day-electricity').textContent = '¥' + formatNumber(data.day.totalElectricityFee);
                         document.getElementById('day-service').textContent = '¥' + formatNumber(data.day.totalServiceFee);
                         document.getElementById('day-income').textContent = '¥' + formatNumber(data.day.totalIncome);
-                        document.getElementById('day-orders').textContent = Math.round(data.day.totalCount).toLocaleString();
+                        document.getElementById('day-orders').textContent = formatNumber(data.day.totalCount);
                         document.getElementById('day-duration').textContent = formatDuration(data.day.totalDuration);
                     }
 
@@ -9762,7 +9762,7 @@ function initChargingBoardExport() {
                         document.getElementById('month-electricity').textContent = '¥' + formatNumber(data.month.totalElectricityFee);
                         document.getElementById('month-service').textContent = '¥' + formatNumber(data.month.totalServiceFee);
                         document.getElementById('month-income').textContent = '¥' + formatNumber(data.month.totalIncome);
-                        document.getElementById('month-orders').textContent = Math.round(data.month.totalCount).toLocaleString();
+                        document.getElementById('month-orders').textContent = formatNumber(data.month.totalCount);
                         document.getElementById('month-duration').textContent = formatDuration(data.month.totalDuration);
                     }
 
@@ -9772,7 +9772,7 @@ function initChargingBoardExport() {
                         document.getElementById('year-electricity').textContent = '¥' + formatNumber(data.year.totalElectricityFee);
                         document.getElementById('year-service').textContent = '¥' + formatNumber(data.year.totalServiceFee);
                         document.getElementById('year-income').textContent = '¥' + formatNumber(data.year.totalIncome);
-                        document.getElementById('year-orders').textContent = Math.round(data.year.totalCount).toLocaleString();
+                        document.getElementById('year-orders').textContent = formatNumber(data.year.totalCount);
                         document.getElementById('year-duration').textContent = formatDuration(data.year.totalDuration);
                     }
 
@@ -9803,7 +9803,7 @@ function initChargingBoardExport() {
                         totalElectricityEl.textContent = '¥' + formatNumber(totalData.totalElectricityFee);
                         totalServiceEl.textContent = '¥' + formatNumber(totalData.totalServiceFee);
                         totalIncomeEl.textContent = '¥' + formatNumber(totalData.totalIncome);
-                        totalOrdersEl.textContent = Math.round(totalData.totalCount).toLocaleString();
+                        totalOrdersEl.textContent = formatNumber(totalData.totalCount);
 
                         if (totalDurationEl) {
                             totalDurationEl.textContent = formatDuration(totalData.totalDuration);

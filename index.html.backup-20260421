@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>长沙峰哥数据管理平台</title>
     <script id="chartjs-cdn" src="https://cdn.bootcdn.net/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" onerror="this.onerror=null; this.src='https://cdn.staticfile.org/Chart.js/4.4.1/chart.umd.min.js'; this.onerror=function(){ this.onerror=null; this.src='https://unpkg.com/chart.js@4.4.1/dist/chart.umd.min.js'; };"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- 引入 Supabase SDK（内嵌） -->
@@ -3653,8 +3652,8 @@
                     <i class="fas fa-charging-station"></i> 充电数据
                     <select id="charging-station-filter" style="margin-left: 20px; padding: 5px 10px; border-radius: 5px; border: 1px solid #ddd; font-size: 14px; cursor: pointer;">
                         <option value="all">全部站点</option>
-                        <option value="xfl">兴发路站</option>
-                        <option value="jintai">锦泰广场站</option>
+                        <option value="didi">兴发路站</option>
+                        <option value="teld">锦泰广场站</option>
                     </select>
                 </h2>
                 <!-- 充电数据指标板块 -->
@@ -3854,8 +3853,10 @@
             <div style="display: flex; align-items: center; margin-left: auto; gap: 10px;">
                 <select id="uncharged-station-filter" style="padding: 5px;">
                     <option value="all">全部站点</option>
-                    <option value="长沙特来电锦泰广场充电站">锦泰广场站</option>
-                    <option value="长沙市岳麓区兴发路充电站">兴发路站</option>
+                    <option value="长沙飞狐锦泰广场站">长沙飞狐锦泰广场站</option>
+                    <option value="飞狐兴发路东区充电站">飞狐兴发路东区充电站</option>
+                    <option value="飞狐兴发路南区充电站">飞狐兴发路南区充电站</option>
+                    <option value="飞狐兴发路西区充电站">飞狐兴发路西区充电站</option>
                 </select>
                 <select id="uncharged-duration-filter" style="padding: 5px;">
                     <option value="all">全部时长</option>
@@ -4138,7 +4139,7 @@
 </div>
  
                <!-- 站点数据统计板块 -->
-<div class="site-stats-section" style="display: none;">
+<div class="site-stats-section">
     <h2 class="section-title"><i class="fas fa-chart-bar"></i> 站点数据统计</h2>
     <div class="site-stats-container">
         <!-- 控制按钮区域 -->
@@ -4281,11 +4282,6 @@
             <i class="fas fa-table"></i>
             充电数据表格
             <div style="display: flex; align-items: center; margin-left: auto; gap: 10px;">
-                <select id="charging-board-station-filter" style="padding: 5px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; cursor: pointer;">
-                    <option value="all">全部站点</option>
-                    <option value="xfl">兴发路站</option>
-                    <option value="jintai">锦泰广场站</option>
-                </select>
                 <div style="display: flex; align-items: center; gap: 5px; border: 1px solid #ddd; border-radius: 6px; padding: 2px;">
                     <button id="year-prev-btn" style="border: none; background: transparent; cursor: pointer; padding: 5px 8px; font-size: 16px; color: #666;" title="上一年">‹</button>
                     <input type="text" id="year-select" readonly style="padding: 5px 10px; border: none; text-align: center; width: 80px; font-size: 14px; background: transparent; cursor: default;">
@@ -4589,9 +4585,7 @@
 
     <script>
         // API 配置
-        const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '192.168.0.166'
-            ? window.location.origin
-            : 'https://fgxny.onrender.com';
+        const API_URL = 'https://fgxny-api.csfh.asia';
 
         // Supabase 配置
         // ⚠️ 重要：必须使用 publishable key（公开密钥），不要使用 secret key（密钥）
@@ -9136,41 +9130,30 @@ function refreshSiteStatsData() {
 let chargingBoardData = [];
 
 // 加载充电数据看板数据
-async function loadChargingBoardData() {
-    try {
-        const stationFilter = document.getElementById('charging-board-station-filter');
-        const yearSelect = document.getElementById('year-select');
-        const station = stationFilter ? stationFilter.value : 'all';
-
-        // 保存当前选中的年份
-        const currentYear = yearSelect && yearSelect.dataset.currentYear ? parseInt(yearSelect.dataset.currentYear) : null;
-
-        // 从MySQL历史数据表查询数据
-        const response = await fetch(`${API_URL}/api/local/charging-board-history?station=${station}`);
-        const result = await response.json();
-
-        if (result.success) {
-            chargingBoardData = result.data;
-
-            // 初始化年份选择器（包含初始渲染），传入当前年份以保持选中状态
-            initYearSelect(currentYear);
-
-            // 更新充电数据总趋势图表
-            renderChargingTrendChart();
-
-            // 初始化站点筛选器事件
-            if (stationFilter && !stationFilter.dataset.initialized) {
-                stationFilter.addEventListener('change', () => {
-                    loadChargingBoardData();
+function loadChargingBoardData() {
+    // 使用缓存管理器加载数据（与loadMetricsData共享缓存）
+    resourceCache.get('https://www.csfhcdz.cn/data/homepage.xlsx')
+        .then(workbook => {
+            
+            // 获取Chargingdata工作表
+            const chargingSheet = workbook.Sheets['Chargingdata'];
+            const jsonData = XLSX.utils.sheet_to_json(chargingSheet, { header: 1 });
+            
+            // 保存表头和数据
+            const headers = jsonData[0];
+            chargingBoardData = jsonData.slice(1).map(row => {
+                let obj = {};
+                headers.forEach((header, index) => {
+                    obj[header] = row[index];
                 });
-                stationFilter.dataset.initialized = 'true';
-            }
-        } else {
-            console.error('加载充电数据看板数据失败:', result.message);
-        }
-    } catch (error) {
-        console.error('加载充电数据看板数据失败:', error);
-    }
+                return obj;
+            });
+            
+            // 初始化年份选择器（包含初始渲染）
+            initYearSelect();
+        })
+        .catch(error => {
+        });
 }
 
 // 将时间值转换为Date对象的辅助函数
@@ -9254,84 +9237,75 @@ function extractYear(dateValue) {
 }
 
 // 初始化年份选择器（翻页按钮）
-function initYearSelect(preserveYear = null) {
+function initYearSelect() {
     const yearSelect = document.getElementById('year-select');
     const prevBtn = document.getElementById('year-prev-btn');
     const nextBtn = document.getElementById('year-next-btn');
-
+    
     // 获取数据中存在的年份
     const years = new Set();
     chargingBoardData.forEach(item => {
-        if (item['年份']) {
-            years.add(item['年份']);
+        if (item['时间']) {
+            const year = extractYear(item['时间']);
+            if (year) {
+                years.add(year);
+            }
         }
     });
-
+    
     // 排序年份
     const sortedYears = Array.from(years).sort((a, b) => a - b);
-
+    
     // 调试信息：输出提取到的年份
     console.log('充电数据表格 - 提取到的年份:', sortedYears);
-
+    
     // 将可用年份列表存储到元素上
     yearSelect.dataset.availableYears = JSON.stringify(sortedYears);
-
-    // 确定要显示的年份：优先使用传入的年份，其次是当前年份，最后是最新年份
-    let initialYear;
-    if (preserveYear && sortedYears.includes(preserveYear)) {
-        initialYear = preserveYear;
-    } else {
-        const currentYear = new Date().getFullYear();
-        if (sortedYears.includes(currentYear)) {
-            initialYear = currentYear;
-        } else if (sortedYears.length > 0) {
-            initialYear = sortedYears[sortedYears.length - 1];
-        }
+    
+    // 设置默认选中当前年份
+    const currentYear = new Date().getFullYear();
+    let initialYear = currentYear;
+    if (!sortedYears.includes(currentYear) && sortedYears.length > 0) {
+        initialYear = sortedYears[sortedYears.length - 1]; // 如果没有当前年份，选择最后一个
     }
-
+    
     yearSelect.value = initialYear + '年';
     yearSelect.dataset.currentYear = initialYear;
-
+    
     // 更新按钮状态
     updateYearButtons(yearSelect, prevBtn, nextBtn, sortedYears);
-
+    
     // 初始渲染
     renderChargingBoardTable(initialYear);
-
-    // 添加翻页按钮事件监听（只添加一次）
-    if (!prevBtn.dataset.initialized) {
-        prevBtn.addEventListener('click', function() {
-            const availableYears = JSON.parse(yearSelect.dataset.availableYears);
-            const currentYear = parseInt(yearSelect.dataset.currentYear);
-            const currentIndex = availableYears.indexOf(currentYear);
-
-            if (currentIndex > 0) {
-                const prevYear = availableYears[currentIndex - 1];
-                yearSelect.value = prevYear + '年';
-                yearSelect.dataset.currentYear = prevYear;
-                updateYearButtons(yearSelect, prevBtn, nextBtn, availableYears);
-                renderChargingBoardTable(prevYear);
-            }
-        });
-        prevBtn.dataset.initialized = 'true';
-    }
-
-    if (!nextBtn.dataset.initialized) {
-        nextBtn.addEventListener('click', function() {
-            const availableYears = JSON.parse(yearSelect.dataset.availableYears);
-            const currentYear = parseInt(yearSelect.dataset.currentYear);
-            const currentIndex = availableYears.indexOf(currentYear);
-
-            if (currentIndex < availableYears.length - 1) {
-                const nextYear = availableYears[currentIndex + 1];
-                yearSelect.value = nextYear + '年';
-                yearSelect.dataset.currentYear = nextYear;
-                updateYearButtons(yearSelect, prevBtn, nextBtn, availableYears);
-                renderChargingBoardTable(nextYear);
-            }
-        });
-        nextBtn.dataset.initialized = 'true';
-    }
+    
+    // 添加翻页按钮事件监听
+    prevBtn.addEventListener('click', function() {
+        const availableYears = JSON.parse(yearSelect.dataset.availableYears);
+        const currentYear = parseInt(yearSelect.dataset.currentYear);
+        const currentIndex = availableYears.indexOf(currentYear);
+        
+        if (currentIndex > 0) {
+            const prevYear = availableYears[currentIndex - 1];
+            yearSelect.value = prevYear + '年';
+            yearSelect.dataset.currentYear = prevYear;
+            updateYearButtons(yearSelect, prevBtn, nextBtn, availableYears);
+            renderChargingBoardTable(prevYear);
+        }
+    });
+    
+    nextBtn.addEventListener('click', function() {
+        const availableYears = JSON.parse(yearSelect.dataset.availableYears);
+        const currentYear = parseInt(yearSelect.dataset.currentYear);
+        const currentIndex = availableYears.indexOf(currentYear);
+        
+        if (currentIndex < availableYears.length - 1) {
+            const nextYear = availableYears[currentIndex + 1];
+            yearSelect.value = nextYear + '年';
+            yearSelect.dataset.currentYear = nextYear;
+            updateYearButtons(yearSelect, prevBtn, nextBtn, availableYears);
+            renderChargingBoardTable(nextYear);
+        }
+    });
 }
 
 // 更新年份翻页按钮状态
@@ -9360,53 +9334,92 @@ function updateYearButtons(yearSelect, prevBtn, nextBtn, availableYears) {
 function renderChargingBoardTable(year) {
     const tableBody = document.getElementById('charging-board-table-body');
     tableBody.innerHTML = '';
-
+    
     // 过滤出指定年份的数据
     const yearData = chargingBoardData.filter(item => {
-        return item['年份'] === year;
+        if (item['时间']) {
+            const itemYear = extractYear(item['时间']);
+            return itemYear === year;
+        }
+        return false;
     });
-
-    // 按月份排序
-    yearData.sort((a, b) => a['月份'] - b['月份']);
-
+    
+    // 按时间排序
+    yearData.sort((a, b) => {
+        const dateA = parseTimeToDate(a['时间']);
+        const dateB = parseTimeToDate(b['时间']);
+        if (!dateA && !dateB) return 0;
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+        return dateA.getTime() - dateB.getTime();
+    });
+    
     // 填充数据
     let totalCharge = 0;
     let totalElectricity = 0;
     let totalService = 0;
     let totalIncome = 0;
     let totalOrders = 0;
-
+    
     yearData.forEach(item => {
         const row = document.createElement('tr');
-
+        
         // 格式化时间显示为yyyy-mm
-        const timeDisplay = `${item['年份']}-${String(item['月份']).padStart(2, '0')}`;
-
+        let timeDisplay = '';
+        if (item['时间'] instanceof Date) {
+            const date = item['时间'];
+            timeDisplay = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+        } else if (typeof item['时间'] === 'string') {
+            const date = new Date(item['时间']);
+            if (!isNaN(date.getTime())) {
+                timeDisplay = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+            } else {
+                timeDisplay = item['时间'];
+            }
+        } else if (typeof item['时间'] === 'number') {
+            // 处理数字类型：可能是Excel日期序列号或年份
+            if (item['时间'] > 25569) {
+                // 可能是Excel日期序列号
+                const date = new Date((item['时间'] - 25569) * 86400 * 1000);
+                if (!isNaN(date.getTime())) {
+                    timeDisplay = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+                } else {
+                    timeDisplay = item['时间'].toString();
+                }
+            } else if (item['时间'] >= 1900 && item['时间'] <= 2100) {
+                // 如果数字本身就是年份（如2026、2027），显示为年份-01
+                timeDisplay = `${Math.floor(item['时间'])}-01`;
+            } else {
+                timeDisplay = item['时间'].toString();
+            }
+        }
+        
         row.innerHTML = `
             <td>${timeDisplay}</td>
-            <td>${formatNumber(item['充电量'])}</td>
-            <td>${formatNumber(item['充电电费'])}</td>
-            <td>${formatNumber(item['充电服务费'])}</td>
-            <td>${formatNumber(item['总收入'])}</td>
-            <td>${formatNumber(item['订单数量'])}</td>
+            <td>${formatNumber(item['充电量(kwh)'])}</td>
+            <td>${formatNumber(item['充电电费(元)'])}</td>
+            <td>${formatNumber(item['充电服务费(元)'])}</td>
+            <td>${formatNumber(item['充电总收入(元)'])}</td>
+            <td>${formatNumber(item['总订单数量'])}</td>
         `;
-
+        
         tableBody.appendChild(row);
-
+        
         // 计算合计
-        totalCharge += Number(item['充电量']) || 0;
-        totalElectricity += Number(item['充电电费']) || 0;
-        totalService += Number(item['充电服务费']) || 0;
-        totalIncome += Number(item['总收入']) || 0;
-        totalOrders += Number(item['订单数量']) || 0;
+        totalCharge += Number(item['充电量(kwh)']) || 0;
+        totalElectricity += Number(item['充电电费(元)']) || 0;
+        totalService += Number(item['充电服务费(元)']) || 0;
+        totalIncome += Number(item['充电总收入(元)']) || 0;
+        totalOrders += Number(item['总订单数量']) || 0;
     });
-
+    
     // 添加合计行
     const totalRow = document.createElement('tr');
-    totalRow.style.backgroundColor = '#f0f8ff';
-    totalRow.style.fontWeight = 'bold';
-    totalRow.style.color = '#0066cc';
-
+    // 为合计行添加样式：背景色和加粗字体
+    totalRow.style.backgroundColor = '#f0f8ff'; // 浅蓝色背景
+    totalRow.style.fontWeight = 'bold'; // 加粗字体
+    totalRow.style.color = '#0066cc'; // 蓝色文字
+    
     totalRow.innerHTML = `
         <td>合计</td>
         <td>${formatNumber(totalCharge)}</td>
@@ -9416,39 +9429,65 @@ function renderChargingBoardTable(year) {
         <td>${formatNumber(totalOrders)}</td>
     `;
     tableBody.appendChild(totalRow);
-
-    // 渲染图表 - 显示当前选中年份的数据趋势
+    
+    // 渲染图表
     renderChargingBoardChart(yearData);
 }
 
 // 渲染充电数据看板图表
 function renderChargingBoardChart(data) {
     const ctx = document.getElementById('charging-board-chart').getContext('2d');
-
+    
     // 如果已存在图表实例，先销毁它
     if (window.chargingBoardChartInstance) {
         window.chargingBoardChartInstance.destroy();
     }
-
-    // 按年份和月份排序
-    const sortedData = [...data].sort((a, b) => {
-        if (a['年份'] !== b['年份']) {
-            return a['年份'] - b['年份'];
-        }
-        return a['月份'] - b['月份'];
+    
+    // 按时间排序
+    data.sort((a, b) => {
+        const dateA = parseTimeToDate(a['时间']);
+        const dateB = parseTimeToDate(b['时间']);
+        if (!dateA && !dateB) return 0;
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+        return dateA.getTime() - dateB.getTime();
     });
-
+    
     // 准备图表数据
-    const labels = sortedData.map(item => `${item['年份']}-${String(item['月份']).padStart(2, '0')}`);
-
-    const chargeData = sortedData.map(item => Number(item['充电量']) || 0);
-    const serviceData = sortedData.map(item => Number(item['充电服务费']) || 0);
-
-    // 创建渐变色
-    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-    gradient.addColorStop(0, 'rgba(26, 115, 232, 0.8)');
-    gradient.addColorStop(1, 'rgba(26, 115, 232, 0.3)');
-
+    const labels = data.map(item => {
+        if (item['时间'] instanceof Date) {
+            const date = item['时间'];
+            return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+        } else if (typeof item['时间'] === 'string') {
+            const date = new Date(item['时间']);
+            if (!isNaN(date.getTime())) {
+                return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+            } else {
+                return item['时间'];
+            }
+        } else if (typeof item['时间'] === 'number') {
+            // 处理数字类型：可能是Excel日期序列号或年份
+            if (item['时间'] > 25569) {
+                // 可能是Excel日期序列号
+                const date = new Date((item['时间'] - 25569) * 86400 * 1000);
+                if (!isNaN(date.getTime())) {
+                    return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+                } else {
+                    return item['时间'].toString();
+                }
+            } else if (item['时间'] >= 1900 && item['时间'] <= 2100) {
+                // 如果数字本身就是年份（如2026、2027），显示为年份-01
+                return `${Math.floor(item['时间'])}-01`;
+            } else {
+                return item['时间'].toString();
+            }
+        }
+        return '';
+    });
+    
+    const chargeData = data.map(item => Number(item['充电量(kwh)']) || 0);
+    const serviceData = data.map(item => Number(item['充电服务费(元)']) || 0);
+    
     // 创建图表
     window.chargingBoardChartInstance = new Chart(ctx, {
         type: 'bar',
@@ -9458,22 +9497,10 @@ function renderChargingBoardChart(data) {
                 {
                     label: '充电量 (kwh)',
                     data: chargeData,
-                    backgroundColor: gradient,
+                    backgroundColor: 'rgba(26, 115, 232, 0.7)',
                     borderColor: 'rgba(26, 115, 232, 1)',
-                    borderWidth: 2,
-                    borderRadius: 6,
-                    yAxisID: 'y',
-                    datalabels: {
-                        display: true,
-                        anchor: 'end',
-                        align: 'top',
-                        formatter: (value) => value.toLocaleString('zh-CN', { maximumFractionDigits: 0 }),
-                        color: '#1a73e8',
-                        font: {
-                            weight: 'bold',
-                            size: 10
-                        }
-                    }
+                    borderWidth: 1,
+                    yAxisID: 'y'
                 },
                 {
                     label: '充电服务费 (元)',
@@ -9481,81 +9508,15 @@ function renderChargingBoardChart(data) {
                     type: 'line',
                     borderColor: 'rgba(0, 200, 83, 1)',
                     backgroundColor: 'rgba(0, 200, 83, 0.1)',
-                    borderWidth: 3,
+                    borderWidth: 2,
                     fill: false,
-                    tension: 0.4,
-                    pointRadius: 5,
-                    pointHoverRadius: 7,
-                    pointBackgroundColor: 'rgba(0, 200, 83, 1)',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2,
-                    pointHoverBackgroundColor: 'rgba(0, 200, 83, 1)',
-                    pointHoverBorderColor: '#fff',
-                    yAxisID: 'y1',
-                    datalabels: {
-                        display: true,
-                        anchor: 'end',
-                        align: 'top',
-                        formatter: (value) => value.toLocaleString('zh-CN', { maximumFractionDigits: 2 }),
-                        color: '#00c853',
-                        font: {
-                            weight: 'bold',
-                            size: 10
-                        }
-                    }
+                    yAxisID: 'y1'
                 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            interaction: {
-                mode: 'index',
-                intersect: false,
-            },
-            plugins: {
-                legend: {
-                    display: true,
-                    position: 'top',
-                    labels: {
-                        usePointStyle: true,
-                        padding: 15,
-                        font: {
-                            size: 13
-                        }
-                    }
-                },
-                tooltip: {
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                    padding: 12,
-                    titleFont: {
-                        size: 14,
-                        weight: 'bold'
-                    },
-                    bodyFont: {
-                        size: 13
-                    },
-                    bodySpacing: 6,
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            if (context.parsed.y !== null) {
-                                label += context.parsed.y.toLocaleString('zh-CN', {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2
-                                });
-                            }
-                            return label;
-                        }
-                    }
-                },
-                datalabels: {
-                    display: false
-                }
-            },
             scales: {
                 y: {
                     type: 'linear',
@@ -9563,25 +9524,7 @@ function renderChargingBoardChart(data) {
                     position: 'left',
                     title: {
                         display: true,
-                        text: '充电量 (kwh)',
-                        font: {
-                            size: 13,
-                            weight: 'bold'
-                        },
-                        color: '#1a73e8'
-                    },
-                    grid: {
-                        color: 'rgba(0, 0, 0, 0.05)',
-                        drawBorder: false,
-                        lineWidth: 1
-                    },
-                    ticks: {
-                        callback: function(value) {
-                            return value.toLocaleString('zh-CN');
-                        },
-                        font: {
-                            size: 11
-                        }
+                        text: '充电量 (kwh)'
                     }
                 },
                 y1: {
@@ -9590,73 +9533,15 @@ function renderChargingBoardChart(data) {
                     position: 'right',
                     title: {
                         display: true,
-                        text: '充电服务费 (元)',
-                        font: {
-                            size: 13,
-                            weight: 'bold'
-                        },
-                        color: '#00c853'
+                        text: '充电服务费 (元)'
                     },
                     grid: {
                         drawOnChartArea: false,
                     },
-                    ticks: {
-                        callback: function(value) {
-                            return value.toLocaleString('zh-CN');
-                        },
-                        font: {
-                            size: 11
-                        }
-                    }
-                },
-                x: {
-                    grid: {
-                        display: false
-                    },
-                    ticks: {
-                        font: {
-                            size: 11
-                        }
-                    }
                 }
-            },
-            animation: {
-                duration: 1000,
-                easing: 'easeInOutQuart'
             }
         }
     });
-}
-
-// 渲染充电数据总趋势图表（按年度汇总）
-function renderChargingTrendChart() {
-    // 按年份汇总数据
-    const yearlyData = {};
-    chargingBoardData.forEach(item => {
-        const year = item['年份'];
-        if (!yearlyData[year]) {
-            yearlyData[year] = {
-                充电量: 0,
-                充电服务费: 0
-            };
-        }
-        yearlyData[year].充电量 += Number(item['充电量']) || 0;
-        yearlyData[year].充电服务费 += Number(item['充电服务费']) || 0;
-    });
-
-    // 排序年份并准备图表数据
-    const years = Object.keys(yearlyData).sort((a, b) => a - b);
-    const labels = years.map(y => y + '年');
-    const chargingData = years.map(y => yearlyData[y].充电量);
-    const serviceIncomeData = years.map(y => yearlyData[y].充电服务费);
-
-    // 更新图表
-    if (chargingTrendChart) {
-        chargingTrendChart.data.labels = labels;
-        chargingTrendChart.data.datasets[0].data = chargingData;
-        chargingTrendChart.data.datasets[1].data = serviceIncomeData;
-        chargingTrendChart.update();
-    }
 }
 
 // 导出充电数据看板数据
@@ -9664,17 +9549,21 @@ function exportChargingBoardData() {
     // 获取当前显示的年份
     const yearSelect = document.getElementById('year-select');
     const year = parseInt(yearSelect.dataset.currentYear || yearSelect.value.replace('年', ''));
-
+    
     // 过滤出指定年份的数据
     const yearData = chargingBoardData.filter(item => {
-        return item['年份'] === year;
+        if (item['时间']) {
+            const itemYear = extractYear(item['时间']);
+            return itemYear === year;
+        }
+        return false;
     });
-
+    
     // 创建一个新的工作簿
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(yearData);
     XLSX.utils.book_append_sheet(wb, ws, '充电数据');
-
+    
     // 导出文件
     XLSX.writeFile(wb, `充电数据_${year}年.xlsx`);
 }
@@ -9689,29 +9578,29 @@ function initChargingBoardExport() {
 
         // 2026年以前的历史数据（基础数据）
         const historicalDataBefore2026 = {
-            xfl: {
-                totalCount: 32080,
-                totalElectricityFee: 512861.51,
-                totalServiceFee: 252194.13,
-                totalIncome: 765055.64,
-                totalElectricity: 926332.906,
-                totalDuration: 1371658 // 分钟 (22860小时58分26秒)
+            didi: {
+                totalCount: 1221452,
+                totalElectricityFee: 18461833.12,
+                totalServiceFee: 11349464.59,
+                totalIncome: 29811297.72,
+                totalElectricity: 31345046.69,
+                totalDuration: 56521069 // 分钟
             },
-            jintai: {
-                totalCount: 577925,
-                totalElectricityFee: 8691947.78,
-                totalServiceFee: 4491797.9,
-                totalIncome: 13183745.68,
-                totalElectricity: 14197176.69,
-                totalDuration: 25661519 // 分钟
+            teld: {
+                totalCount: 96455,
+                totalElectricityFee: 1638345.80,
+                totalServiceFee: 596349.27,
+                totalIncome: 2234695.07,
+                totalElectricity: 2756205.04,
+                totalDuration: 4019117 // 分钟
             },
             all: {
-                totalCount: 32080 + 577925,
-                totalElectricityFee: 512861.51 + 8691947.78,
-                totalServiceFee: 252194.13 + 4491797.9,
-                totalIncome: 765055.64 + 13183745.68,
-                totalElectricity: 926332.906 + 14197176.69,
-                totalDuration: 1371658 + 25661519
+                totalCount: 1221452 + 96455,
+                totalElectricityFee: 18461833.12 + 1638345.80,
+                totalServiceFee: 11349464.59 + 596349.27,
+                totalIncome: 29811297.72 + 2234695.07,
+                totalElectricity: 31345046.69 + 2756205.04,
+                totalDuration: 56521069 + 4019117
             }
         };
 
@@ -9741,9 +9630,9 @@ function initChargingBoardExport() {
 
                     // 格式化时长（分钟转为小时）
                     function formatDuration(minutes) {
-                        if (!minutes) return '0.00小时';
-                        const hours = (minutes / 60).toFixed(2);
-                        return parseFloat(hours).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '小时';
+                        if (!minutes) return '0小时';
+                        const hours = Math.round(minutes / 60);
+                        return formatNumber(hours) + '小时';
                     }
 
                     // 更新今日数据
@@ -9752,7 +9641,7 @@ function initChargingBoardExport() {
                         document.getElementById('day-electricity').textContent = '¥' + formatNumber(data.day.totalElectricityFee);
                         document.getElementById('day-service').textContent = '¥' + formatNumber(data.day.totalServiceFee);
                         document.getElementById('day-income').textContent = '¥' + formatNumber(data.day.totalIncome);
-                        document.getElementById('day-orders').textContent = Math.round(data.day.totalCount).toLocaleString();
+                        document.getElementById('day-orders').textContent = formatNumber(data.day.totalCount);
                         document.getElementById('day-duration').textContent = formatDuration(data.day.totalDuration);
                     }
 
@@ -9762,7 +9651,7 @@ function initChargingBoardExport() {
                         document.getElementById('month-electricity').textContent = '¥' + formatNumber(data.month.totalElectricityFee);
                         document.getElementById('month-service').textContent = '¥' + formatNumber(data.month.totalServiceFee);
                         document.getElementById('month-income').textContent = '¥' + formatNumber(data.month.totalIncome);
-                        document.getElementById('month-orders').textContent = Math.round(data.month.totalCount).toLocaleString();
+                        document.getElementById('month-orders').textContent = formatNumber(data.month.totalCount);
                         document.getElementById('month-duration').textContent = formatDuration(data.month.totalDuration);
                     }
 
@@ -9772,7 +9661,7 @@ function initChargingBoardExport() {
                         document.getElementById('year-electricity').textContent = '¥' + formatNumber(data.year.totalElectricityFee);
                         document.getElementById('year-service').textContent = '¥' + formatNumber(data.year.totalServiceFee);
                         document.getElementById('year-income').textContent = '¥' + formatNumber(data.year.totalIncome);
-                        document.getElementById('year-orders').textContent = Math.round(data.year.totalCount).toLocaleString();
+                        document.getElementById('year-orders').textContent = formatNumber(data.year.totalCount);
                         document.getElementById('year-duration').textContent = formatDuration(data.year.totalDuration);
                     }
 
@@ -9803,7 +9692,7 @@ function initChargingBoardExport() {
                         totalElectricityEl.textContent = '¥' + formatNumber(totalData.totalElectricityFee);
                         totalServiceEl.textContent = '¥' + formatNumber(totalData.totalServiceFee);
                         totalIncomeEl.textContent = '¥' + formatNumber(totalData.totalIncome);
-                        totalOrdersEl.textContent = Math.round(totalData.totalCount).toLocaleString();
+                        totalOrdersEl.textContent = formatNumber(totalData.totalCount);
 
                         if (totalDurationEl) {
                             totalDurationEl.textContent = formatDuration(totalData.totalDuration);
@@ -9872,25 +9761,26 @@ function initChargingBoardExport() {
             try {
                 console.log('[用户行为分析] 加载日期:', date);
 
-                // 获取所有站点的小时明细数据
-                const response = await fetch(`${API_URL}/api/local/hourly-details?scope=all&date=${date}`);
-                const result = await response.json();
+                // 分别获取兴发路站和锦泰广场站的数据
+                const didiResponse = await fetch(`${API_URL}/api/local/realtime-summary?scope=didi&detailDate=${date}`);
+                const teldResponse = await fetch(`${API_URL}/api/local/realtime-summary?scope=teld&detailDate=${date}`);
+
+                const didiResult = await didiResponse.json();
+                const teldResult = await teldResponse.json();
 
                 // 提取兴发路站的24小时数据
                 const sfpData = new Array(24).fill(0);
+                if (didiResult.success && didiResult.data.hourlyDetails && didiResult.data.hourlyDetails.rows) {
+                    didiResult.data.hourlyDetails.rows.forEach((row, index) => {
+                        sfpData[index] = row.totalElectricity || 0;
+                    });
+                }
+
                 // 提取锦泰广场站的24小时数据
                 const glData = new Array(24).fill(0);
-
-                if (result.success && result.data && Array.isArray(result.data)) {
-                    result.data.forEach(row => {
-                        // 提取小时数（0-23）
-                        const hour = new Date(row.hour).getHours();
-
-                        if (row.station === 'xfl') {
-                            sfpData[hour] = row.electricity || 0;
-                        } else if (row.station === 'jintai') {
-                            glData[hour] = row.electricity || 0;
-                        }
+                if (teldResult.success && teldResult.data.hourlyDetails && teldResult.data.hourlyDetails.rows) {
+                    teldResult.data.hourlyDetails.rows.forEach((row, index) => {
+                        glData[index] = row.totalElectricity || 0;
                     });
                 }
 
@@ -9922,25 +9812,26 @@ function initChargingBoardExport() {
                     const today = new Date(hourlyDetails.date || new Date());
                     const dateKey = today.toISOString().split('T')[0];
 
-                    // 获取所有站点的小时明细数据
-                    const response = await fetch(`${API_URL}/api/local/hourly-details?scope=all&date=${dateKey}`);
-                    const result = await response.json();
+                    // 分别获取兴发路站和锦泰广场站的数据
+                    const didiResponse = await fetch(`${API_URL}/api/local/realtime-summary?scope=didi`);
+                    const teldResponse = await fetch(`${API_URL}/api/local/realtime-summary?scope=teld`);
+
+                    const didiResult = await didiResponse.json();
+                    const teldResult = await teldResponse.json();
 
                     // 提取兴发路站的24小时数据
                     const sfpData = new Array(24).fill(0);
+                    if (didiResult.success && didiResult.data.hourlyDetails && didiResult.data.hourlyDetails.rows) {
+                        didiResult.data.hourlyDetails.rows.forEach((row, index) => {
+                            sfpData[index] = row.totalElectricity || 0;
+                        });
+                    }
+
                     // 提取锦泰广场站的24小时数据
                     const glData = new Array(24).fill(0);
-
-                    if (result.success && result.data && Array.isArray(result.data)) {
-                        result.data.forEach(row => {
-                            // 提取小时数（0-23）
-                            const hour = new Date(row.hour).getHours();
-
-                            if (row.station === 'xfl') {
-                                sfpData[hour] = row.electricity || 0;
-                            } else if (row.station === 'jintai') {
-                                glData[hour] = row.electricity || 0;
-                            }
+                    if (teldResult.success && teldResult.data.hourlyDetails && teldResult.data.hourlyDetails.rows) {
+                        teldResult.data.hourlyDetails.rows.forEach((row, index) => {
+                            glData[index] = row.totalElectricity || 0;
                         });
                     }
 
@@ -10367,6 +10258,34 @@ async function loadIncomeDashboardData() {
         // 加载当前年份数据
         const currentYear = new Date().getFullYear();
         loadYearData(currentYear.toString());
+
+                    // 处理充电数据总趋势图表数据（csdjzqs工作表）
+if (workbook.SheetNames.includes('csdjzqs')) {
+    const csdjzqsSheet = workbook.Sheets['csdjzqs'];
+    const csdjzqsJson = XLSX.utils.sheet_to_json(csdjzqsSheet, { header: 1 });
+
+    // 提取数据
+    const labels = [];
+    const chargingData = [];
+    const serviceIncomeData = [];
+
+    for (let i = 1; i < csdjzqsJson.length; i++) {
+        const row = csdjzqsJson[i];
+        if (row && row.length >= 3) {
+            labels.push(row[0]); // 年份
+            chargingData.push(row[1]); // 充电量
+            serviceIncomeData.push(row[2]); // 服务费收入
+        }
+    }
+
+    // 更新充电数据总趋势图表
+    if (chargingTrendChart) {
+        chargingTrendChart.data.labels = labels;
+        chargingTrendChart.data.datasets[0].data = chargingData;
+        chargingTrendChart.data.datasets[1].data = serviceIncomeData;
+        chargingTrendChart.update();
+    }
+}
 
                 // 处理年度总收入趋势图表数据（ndzsrqs工作表）
 if (workbook.SheetNames.includes('ndzsrqs')) {
@@ -12240,60 +12159,64 @@ function updateUnchargedTable() {
         // 加载行为数据
         async function loadBehaviorData() {
             try {
+                const response = await fetch('https://www.csfhcdz.cn/data/yhxw.xlsx?t=' + new Date().getTime());
+                const data = await response.arrayBuffer();
+                const workbook = XLSX.read(data, { type: 'array' });
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }); // 调试用
+
+                // 处理数据 - 按照Excel文件的实际格式加载
                 behaviorData = [];
 
-                // 获取最近30天的日期
-                const today = new Date();
-                const dates = [];
-                for (let i = 29; i >= 0; i--) {
-                    const date = new Date(today);
-                    date.setDate(today.getDate() - i);
-                    dates.push(date.toISOString().split('T')[0]);
-                }
-
-                // 并行加载所有日期的数据
-                const promises = dates.map(async (dateStr) => {
-                    try {
-                        const xflResponse = await fetch(`${API_URL}/api/local/hourly-details?date=${dateStr}&scope=xfl`);
-                        const xflResult = await xflResponse.json();
-
-                        const jintaiResponse = await fetch(`${API_URL}/api/local/hourly-details?date=${dateStr}&scope=jintai`);
-                        const jintaiResult = await jintaiResponse.json();
-
-                        if (xflResult.success && jintaiResult.success) {
-                            // 提取24小时的充电量数据
-                            const xflData = xflResult.data.map(item => item.totalElectricity || 0);
-                            const jintaiData = jintaiResult.data.map(item => item.totalElectricity || 0);
-
-                            // 检查是否有数据（至少有一个小时有充电量）
-                            const hasData = xflData.some(v => v > 0) || jintaiData.some(v => v > 0);
-
-                            if (hasData) {
-                                return {
-                                    date: dateStr,
-                                    displayDate: dateStr,
-                                    sfpData: xflData,      // 兴发路站
-                                    glData: jintaiData     // 锦泰广场站
-                                };
-                            }
+                // 按照Excel文件格式：A列日期，B列站点，C-Z列24小时数据
+                // 每天占两行：第一行兴发路站，第二行锦泰广场站
+                for (let i = 1; i < jsonData.length; i += 2) {
+                    const dateRow = jsonData[i];      // 兴发路站行
+                    const stationRow = jsonData[i + 1]; // 锦泰广场站行
+                    
+                    if (dateRow && dateRow[0]) {
+                        const dateStr = dateRow[0];
+                        let date;
+                        
+                        // 处理不同的日期格式
+                        if (typeof dateStr === 'number') {
+                            // Excel日期数字格式
+                            date = new Date((dateStr - 25569) * 86400 * 1000);
+                        } else if (typeof dateStr === 'string') {
+                            // 字符串格式
+                            date = new Date(dateStr);
+                        } else {
+                            continue;
                         }
-                        return null;
-                    } catch (error) {
-                        console.error(`加载 ${dateStr} 数据失败:`, error);
-                        return null;
+
+                        const dateKey = date.toISOString().split('T')[0];
+
+                        // 过滤未来日期：只添加今天及以前的数据
+                        const today = new Date().toISOString().split('T')[0];
+                        if (dateKey > today) {
+                            continue; // 跳过未来日期
+                        }
+
+                        // 从C列开始获取24小时数据（索引2-25）
+                        const sfpData = dateRow.slice(2, 26) || new Array(24).fill(0);
+                        const glData = stationRow ? stationRow.slice(2, 26) : new Array(24).fill(0);
+
+                        // 添加到图表数据（用于翻页和图表显示）
+                        if (!behaviorData.find(d => d.date === dateKey)) {
+                            behaviorData.push({
+                                date: dateKey,
+                                displayDate: dateKey, // 统一使用 yyyy-mm-dd 格式
+                                sfpData: sfpData,
+                                glData: glData
+                            });
+                        }
                     }
-                });
-
-                // 等待所有请求完成
-                const results = await Promise.all(promises);
-
-                // 过滤掉null值并添加到behaviorData
-                behaviorData = results.filter(item => item !== null);
+                }
 
                 // 按日期排序
                 behaviorData.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-                // 设置当前日期为最新日期
+                
+                // 设置当前日期为最大日期
                 if (behaviorData.length > 0) {
                     currentDateIndex = behaviorData.length - 1;
                 }
@@ -12302,7 +12225,6 @@ function updateUnchargedTable() {
                 updateBehaviorButtonStates();
 
             } catch (error) {
-                console.error('加载行为数据失败:', error);
                 // 数据加载失败时也要更新按钮状态
                 updateBehaviorButtonStates();
             }
@@ -12718,10 +12640,10 @@ function updateUnchargedTable() {
                     datasets: [{
                         data: data,
                         backgroundColor: [
-                            '#ff6b6b', '#ffa726', '#66bb6a', '#42a5f5'
+                            '#ff6b6b', '#ffa726', '#66bb6a', '#42a5f5' // 兴发路站：尖峰平谷
                         ],
                         borderColor: [
-                            '#d32f2f', '#f57c00', '#388e3c', '#1976d2'
+                            '#d32f2f', '#f57c00', '#388e3c', '#1976d2' // 兴发路站：尖峰平谷
                         ],
                         borderWidth: 2
                     }]
@@ -12753,22 +12675,9 @@ function updateUnchargedTable() {
                             enabled: false
                         }
                     },
-                    cutout: '50%'
+                    cutout: '50%' // 空心饼图
                 }
             });
-
-            // 更新数字显示
-            document.getElementById('sfp-jian-number').textContent = electricityData.sfp.jian.toFixed(2);
-            document.getElementById('sfp-jian-percent').textContent = '(' + (total > 0 ? (electricityData.sfp.jian / total * 100).toFixed(1) : 0) + '%)';
-
-            document.getElementById('sfp-feng-number').textContent = electricityData.sfp.feng.toFixed(2);
-            document.getElementById('sfp-feng-percent').textContent = '(' + (total > 0 ? (electricityData.sfp.feng / total * 100).toFixed(1) : 0) + '%)';
-
-            document.getElementById('sfp-ping-number').textContent = electricityData.sfp.ping.toFixed(2);
-            document.getElementById('sfp-ping-percent').textContent = '(' + (total > 0 ? (electricityData.sfp.ping / total * 100).toFixed(1) : 0) + '%)';
-
-            document.getElementById('sfp-gu-number').textContent = electricityData.sfp.gu.toFixed(2);
-            document.getElementById('sfp-gu-percent').textContent = '(' + (total > 0 ? (electricityData.sfp.gu / total * 100).toFixed(1) : 0) + '%)';
         }
 
         // 更新锦泰广场站尖峰平谷饼图
@@ -12799,10 +12708,10 @@ function updateUnchargedTable() {
                     datasets: [{
                         data: data,
                         backgroundColor: [
-                            '#e57373', '#ffb74d', '#81c784', '#64b5f6'
+                            '#e57373', '#ffb74d', '#81c784', '#64b5f6' // 锦泰广场站：尖峰平谷
                         ],
                         borderColor: [
-                            '#c62828', '#ef6c00', '#2e7d32', '#1565c0'
+                            '#c62828', '#ef6c00', '#2e7d32', '#1565c0' // 锦泰广场站：尖峰平谷
                         ],
                         borderWidth: 2
                     }]
@@ -12834,22 +12743,9 @@ function updateUnchargedTable() {
                             enabled: false
                         }
                     },
-                    cutout: '50%'
+                    cutout: '50%' // 空心饼图
                 }
             });
-
-            // 更新数字显示
-            document.getElementById('gl-jian-number').textContent = electricityData.gl.jian.toFixed(2);
-            document.getElementById('gl-jian-percent').textContent = '(' + (total > 0 ? (electricityData.gl.jian / total * 100).toFixed(1) : 0) + '%)';
-
-            document.getElementById('gl-feng-number').textContent = electricityData.gl.feng.toFixed(2);
-            document.getElementById('gl-feng-percent').textContent = '(' + (total > 0 ? (electricityData.gl.feng / total * 100).toFixed(1) : 0) + '%)';
-
-            document.getElementById('gl-ping-number').textContent = electricityData.gl.ping.toFixed(2);
-            document.getElementById('gl-ping-percent').textContent = '(' + (total > 0 ? (electricityData.gl.ping / total * 100).toFixed(1) : 0) + '%)';
-
-            document.getElementById('gl-gu-number').textContent = electricityData.gl.gu.toFixed(2);
-            document.getElementById('gl-gu-percent').textContent = '(' + (total > 0 ? (electricityData.gl.gu / total * 100).toFixed(1) : 0) + '%)';
         }
 
 

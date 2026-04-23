@@ -1,0 +1,91 @@
+项目运行所需服务
+                                                                                                                          1. 数据库服务（必须先启动）
+                                                                                                                          SQL Server 数据库
+
+  - 服务器: csfhcdz.f3322.net:1433
+  - 数据库: chargingdata
+  - 用户: csfh
+  - 说明: 这是远程SQL Server，应该已经在运行
+
+  MySQL 数据库
+
+  - 服务器: localhost:3306
+  - 数据库: miniprogram_system
+  - 用户: repair_admin
+  - 密码: password123
+  - 说明: 需要在本地启动MySQL服务
+
+  启动MySQL（Windows）:
+  # 方法1: 通过服务管理
+  net start MySQL
+
+  # 方法2: 如果是XAMPP/WAMP
+  # 打开XAMPP/WAMP控制面板，启动MySQL服务
+
+  ---
+  2. Node.js后端服务（3020端口）
+
+  有多种启动方式，选择其中一种：
+
+  方式1: 使用批处理文件（推荐）
+
+  # 双击运行
+  启动服务.bat
+
+  方式2: 使用PM2（生产环境推荐）
+
+  # 双击运行
+  pm2-start.bat
+
+  # 或命令行
+  pm2 start ecosystem.config.js
+
+  方式3: 使用npm命令
+
+  cd E:\123\sqlserver1-github
+  npm start
+
+  方式4: 开发模式（带自动重启）
+
+  npm run dev
+
+  ---
+  3. 前端页面
+
+  启动后端服务后，通过浏览器访问：
+  - 本地访问: http://localhost:3020
+  - 外网访问: http://csfhcdz.f3322.net:3020
+
+  前端页面是 index.html，由Node.js服务器托管（静态文件服务）。
+
+  ---
+  完整启动步骤
+
+  # 步骤1: 确保MySQL服务运行
+  net start MySQL
+
+  # 步骤2: 启动Node.js后端（选择一种方式）
+  # 方式A: 双击 "启动服务.bat"
+  # 方式B: 或执行命令
+  cd E:\123\sqlserver1-github
+  npm start
+
+  # 步骤3: 打开浏览器访问
+  # http://localhost:3020
+
+  ---
+  验证服务状态
+
+  # 检查后端服务健康状态
+  curl http://localhost:3020/health
+
+  # 或浏览器访问
+  http://localhost:3020/health
+
+  ---
+  注意事项
+
+  1. MySQL必须先启动，否则后端服务会报错
+  2. 端口3020必须未被占用
+  3. SQL Server是远程数据库，需要网络连接
+  4. 项目依赖已安装（如未安装，先运行 npm install）

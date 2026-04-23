@@ -1,0 +1,284 @@
+  项目架构说明
+                                                                                                                          你的项目现在有两套部署环境：
+                                                                                                                          1. 本地开发环境（内网访问）
+
+  - 前端: http://192.168.0.166:3020/index.html
+  - 后端: http://192.168.0.166:3020
+  - 数据库: 本地MySQL（localhost:3306）
+
+  2. 线上生产环境（外网访问）
+
+  - 前端: https://fgxny.asia (GitHub Pages托管)
+  - 后端: https://fgxny.onrender.com (Render.com托管)
+  - 数据库: 本地MySQL通过花生壳外网访问（csfhcdz.f3322.net:3306）
+
+  ---
+  本地开发环境操作
+
+  启动服务
+
+  # 进入项目目录
+  cd E:\123\sqlserver1-github
+
+  # 启动后端服务器
+  node proxy-server.js
+
+  启动成功标志：
+  ✓ SQL Server数据库连接池已建立
+  ✓ MySQL数据库连接池已建立
+  🚀 SQL Server 代理服务器已启动，监听端口: 3020
+     本地访问: http://localhost:3020
+     局域网访问: http://192.168.0.166:3020
+
+  停止服务
+
+  # 在运行服务器的终端按 Ctrl+C
+  # 会看到：
+  正在关闭服务器...
+  SQL Server数据库连接已关闭
+  MySQL数据库连接已关闭
+
+  查看服务状态
+
+  方法1：健康检查接口
+  curl http://localhost:3020/health
+  返回：
+  {"status":"healthy","message":"服务运行正常","database":"connected"}
+
+  方法2：查看日志
+  # 浏览器访问
+  http://localhost:3020/logs
+
+  # 或命令行查看
+  tail -f E:\123\sqlserver1-github\query-logs.txt
+
+  方法3：检查端口占用
+  netstat -ano | findstr :3020
+
+  访问前端页面
+
+  浏览器打开：
+  - 本机访问: http://localhost:3020/index.html
+  - 局域网访问: http://192.168.0.166:3020/index.html
+
+  ---
+  线上生产环境操作
+
+  前端部署（GitHub Pages）
+
+  更新前端代码：
+  cd E:\123\sqlserver1-github
+
+  # 修改 index.html 后提交
+  git add index.html
+  git commit -m "更新前端页面"
+  git push
+
+  生效时间：推送后1-2分钟GitHub Pages自动更新
+
+  访问地址：https://fgxny.asia
+
+  查看部署状态：
+  1. 访问 https://github.com/jiangnanwaw/fgxny
+  2. 点击 Settings → Pages
+  3. 查看部署状态和最后更新时间
+
+  ---
+  后端部署（Render.com）
+
+  更新后端代码：
+  cd E:\123\sqlserver1-github
+
+  # 修改 proxy-server.js 后提交
+  git add proxy-server.js
+  git commit -m "更新后端逻辑"
+  git push
+
+  Render自动部署：
+  - 推送到GitHub后，Render会自动检测并重新部署
+  - 部署时间：约2-3分钟
+
+  手动重启服务：
+  1. 访问 https://dashboard.render.com
+  2. 点击你的服务 fgxny
+  3. 点击右上角 Manual Deploy → Deploy latest commit
+
+  查看服务状态：
+
+  方法1：Render控制台
+  1. 访问 https://dashboard.render.com
+  2. 点击你的服务
+  3. 查看状态指示器：
+    - 🟢  绿色 = 运行正常
+    - 🟡  黄色 = 部署中
+    - 🔴 红色 = 服务异常
+
+  方法2：健康检查接口
+  curl https://fgxny.onrender.com/health
+
+  方法3：查看实时日志
+  1. Render控制台 → 你的服务 → Logs 标签
+  2. 实时显示服务器日志
+
+  查看环境变量配置：
+  1. Render控制台 → 你的服务 → Environment 标签
+  2. 查看/修改环境变量（修改后自动重启）
+
+  ---
+  数据库管理
+
+  本地MySQL
+
+  启动MySQL服务：
+  # Windows服务方式
+  net start MySQL
+
+  # 或通过服务管理器启动
+  services.msc → 找到MySQL → 启动
+
+  停止MySQL服务：
+  net stop MySQL
+
+  查看MySQL状态：
+  # 检查服务状态
+  sc query MySQL
+
+  # 或测试连接
+  mysql -u root -p -e "SELECT 1"
+
+  连接MySQL：
+  # 本地连接
+  mysql -u root -p
+
+  # 外网连接测试
+  mysql -h csfhcdz.f3322.net -P 3306 -u external_user -p
+
+  外网访问配置
+
+  花生壳动态域名：
+  - 域名：csfhcdz.f3322.net
+  - 端口：3306
+  - 确保花生壳客户端保持运行
+
+  MySQL外网用户：
+  - 用户名：external_user
+  - 密码：fh123$%^@!
+  - 权限：miniprogram_system 数据库
+
+  ---
+  完整启动流程
+
+  本地开发环境启动顺序
+
+  # 1. 启动MySQL服务
+  net start MySQL
+
+  # 2. 启动Node.js后端
+  cd E:\123\sqlserver1-github
+  node proxy-server.js
+
+  # 3. 浏览器访问
+  # http://192.168.0.166:3020/index.html
+
+  线上生产环境启动顺序
+
+  一次性配置（已完成）：
+  1. ✓ GitHub Pages已配置（fgxny.asia）
+  2. ✓ Render后端已部署（fgxny.onrender.com）
+  3. ✓ MySQL外网访问已配置（csfhcdz.f3322.net:3306）
+
+  日常维护：
+  1. 确保本地MySQL服务运行
+  2. 确保花生壳客户端运行（保持外网访问）
+  3. Render服务自动运行，无需手动启动
+
+  访问线上服务：
+  - 直接打开 https://fgxny.asia
+  - Render后端24/7自动运行
+
+  ---
+  常见问题排查
+
+  本地环境无法访问
+
+  # 1. 检查后端是否运行
+  curl http://localhost:3020/health
+
+  # 2. 检查端口占用
+  netstat -ano | findstr :3020
+
+  # 3. 查看错误日志
+  type E:\123\sqlserver1-github\query-logs.txt
+
+  线上环境无法访问
+
+  # 1. 检查后端健康状态
+  curl https://fgxny.onrender.com/health
+
+  # 2. 检查MySQL外网连接
+  timeout 5 bash -c 'cat < /dev/null > /dev/tcp/csfhcdz.f3322.net/3306' && echo "✓ MySQL可访问" || echo "✗
+  MySQL不可访问"
+
+  # 3. 查看Render日志
+  # 访问 https://dashboard.render.com → Logs标签
+
+  数据加载失败
+
+  1. 检查Render日志：查看具体错误信息
+  2. 检查环境变量：Render控制台 → Environment标签
+  3. 检查MySQL外网访问：确保花生壳运行
+  4. 检查MySQL用户权限：
+  SELECT user, host FROM mysql.user WHERE user='external_user';
+  SHOW GRANTS FOR 'external_user'@'%';
+
+  ---
+  快速命令参考
+
+  # === 本地开发 ===
+  # 启动服务
+  cd E:\123\sqlserver1-github && node proxy-server.js
+
+  # 停止服务
+  Ctrl+C
+
+  # 查看日志
+  tail -f query-logs.txt
+
+  # === 代码更新 ===
+  # 提交并推送（自动触发部署）
+  git add .
+  git commit -m "更新说明"
+  git push
+
+  # === 健康检查 ===
+  # 本地
+  curl http://localhost:3020/health
+
+  # 线上
+  curl https://fgxny.onrender.com/health
+
+  # === MySQL管理 ===
+  # 启动MySQL
+  net start MySQL
+
+  # 连接MySQL
+  mysql -u root -p
+
+  # 测试外网连接
+  mysql -h csfhcdz.f3322.net -P 3306 -u external_user -p
+
+  ---
+  总结：
+  - 本地开发：手动启动 node proxy-server.js
+  - 线上生产：Render自动运行，推送代码自动部署
+  - 数据库：确保MySQL和花生壳保持运行
+  - 监控：通过 /health 接口和Render日志查看状态
+
+
+确认 MYSQL_PASSWORD 的值是 fh123$%^@!
+
+ MYSQL_HOST = csfhcdz.f3322.net
+  - MYSQL_PORT = 3306
+  - MYSQL_USER = external_user
+  - MYSQL_PASSWORD = fh123$%^@!（注意感叹号）
+  - MYSQL_DATABASE = miniprogram_system
