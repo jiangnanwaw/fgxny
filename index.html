@@ -1998,23 +1998,23 @@
 
 /* 调整指标卡片宽度 */
 .metrics-section > .metrics-row:nth-child(1) .metric-item {
-    background: linear-gradient(135deg, rgba(26, 115, 232, 0.15), rgba(26, 115, 232, 0.05));
-    border-left: 4px solid var(--primary);
+    background: white;
+    border-left: none;
 }
 
 .metrics-section > .metrics-row:nth-child(2) .metric-item {
-    background: linear-gradient(135deg, rgba(0, 200, 83, 0.15), rgba(0, 200, 83, 0.05));
-    border-left: 4px solid var(--accent);
+    background: white;
+    border-left: none;
 }
 
 .metrics-section > .metrics-row:nth-child(3) .metric-item {
-    background: linear-gradient(135deg, rgba(156, 39, 176, 0.15), rgba(156, 39, 176, 0.05));
-    border-left: 4px solid #9c27b0;
+    background: white;
+    border-left: none;
 }
 
 .metrics-section > .metrics-row:nth-child(4) .metric-item {
-    background: linear-gradient(135deg, rgba(255, 193, 7, 0.15), rgba(255, 193, 7, 0.05));
-    border-left: 4px solid #ffc107;
+    background: white;
+    border-left: none;
 }
 /* 悬停效果增强 */
 .metric-item:hover {
@@ -2022,21 +2022,21 @@
     box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
 }
 
-/* 调整指标值的颜色与卡片主题匹配 */
+/* 调整指标值的颜色为黑色 */
 .metrics-section > .metrics-row:nth-child(1) .metric-value {
-    color: var(--primary) !important;
+    color: #000000 !important;
 }
 
 .metrics-section > .metrics-row:nth-child(2) .metric-value {
-    color: var(--accent) !important;
+    color: #000000 !important;
 }
 
 .metrics-section > .metrics-row:nth-child(3) .metric-value {
-    color: #9c27b0 !important;
+    color: #000000 !important;
 }
 
 .metrics-section > .metrics-row:nth-child(4) .metric-value {
-    color: #ff9800 !important;
+    color: #000000 !important;
 }
         .metrics-row {
             display: flex;
@@ -2045,10 +2045,10 @@
         }
 
         .metric-card {
-            background: transparent;
+            background: white;
             border-radius: 12px;
             padding: 12px;
-            box-shadow: none;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             border: none;
             flex: 1;
             min-width: 300px;
@@ -2077,11 +2077,11 @@
     gap: 8px; /* 可以根据需要调整间距 */
 }
 
-/* 修改指标项背景为透明 */
+/* 修改指标项背景为白色 */
 .metric-item {
     padding: 8px;
     border-radius: 8px;
-    background: transparent; /* 改为透明背景 */
+    background: white; /* 白色背景 */
     text-align: center;
     transition: all 0.3s;
 }
@@ -2097,7 +2097,7 @@
         .metric-item {
             padding: 8px;
             border-radius: 8px;
-            background: transparent;
+            background: white;
             text-align: center;
             transition: all 0.3s;
         }
@@ -2110,14 +2110,14 @@
         .metric-value {
             font-size: 18px;
             font-weight: bold;
-            color: var(--primary);
+            color: #000000;
             margin: 5px 0;
             white-space: nowrap;
         }
 /* 在这里添加您的自定义颜色代码 */
 /* 今日充电数据数字颜色 */
 #day-charge, #day-electricity, #day-service, #day-income, #day-orders, #day-duration {
-    color: #e91e63; /* 粉红色系 - 突出今日数据 */
+    color: #000000; /* 黑色 */
 }
 
 /* 本月充电数据数字颜色 */
@@ -2127,16 +2127,16 @@
 
 /* 本年度充电数据数字颜色 */
 #year-charge, #year-electricity, #year-service, #year-income, #year-orders, #year-duration {
-    color: #0c0c0c; /* 深灰色 */
+    color: #000000; /* 黑色 */
 }
 
 /* 累计充电数据数字颜色 */
 #total-charge, #total-electricity, #total-service, #total-income, #total-orders, #total-duration {
-    color: #0c0c0c; /* 深灰色 */
+    color: #000000; /* 黑色 */
 }
 /* 累计综合业务收入数字颜色 */
 #month-income, #year-income, #total-income {
-    color: #0c0c0c; /* 蓝色系 */
+    color: #000000; /* 黑色 */
 }
         .metric-label {
             font-size: 14px;
@@ -3664,32 +3664,32 @@
         <div class="metric-card" style="width: 100%; margin-bottom: 0;">
             <div class="metric-card-title">
                 <i class="fas fa-calendar-day"></i>
-                今日充电数据
+                今日充电数据<span id="today-data-time"></span>
             </div>
             <div class="metric-grid" style="grid-template-columns: repeat(6, 1fr);">
                 <div class="metric-item">
-                    <div class="metric-value" id="day-charge">0 kwh</div>
-                    <div class="metric-label">总充电量</div>
+                    <div class="metric-label">充电量(度)</div>
+                    <div class="metric-value" id="day-charge">0</div>
                 </div>
                 <div class="metric-item">
-                    <div class="metric-value" id="day-electricity">¥0</div>
-                    <div class="metric-label">总电费收入</div>
+                    <div class="metric-label">电费(元)</div>
+                    <div class="metric-value" id="day-electricity">0</div>
                 </div>
                 <div class="metric-item">
-                    <div class="metric-value" id="day-service">¥0</div>
-                    <div class="metric-label">总服务费收入</div>
+                    <div class="metric-label">服务费(元)</div>
+                    <div class="metric-value" id="day-service">0</div>
                 </div>
                 <div class="metric-item">
-                    <div class="metric-value" id="day-income">¥0</div>
-                    <div class="metric-label">综合收入</div>
+                    <div class="metric-label">订单金额(元)</div>
+                    <div class="metric-value" id="day-income">0</div>
                 </div>
                 <div class="metric-item">
+                    <div class="metric-label">订单笔数</div>
                     <div class="metric-value" id="day-orders">0</div>
-                    <div class="metric-label">总订单数量</div>
                 </div>
                 <div class="metric-item">
-                    <div class="metric-value" id="day-duration">0小时</div>
-                    <div class="metric-label">总充电时长</div>
+                    <div class="metric-label">充电时长(小时)</div>
+                    <div class="metric-value" id="day-duration">0</div>
                 </div>
             </div>
         </div>
@@ -3699,32 +3699,32 @@
         <div class="metric-card" style="width: 100%; margin-bottom: 0;">
             <div class="metric-card-title">
                 <i class="fas fa-calendar-check"></i>
-                本月充电数据
+                本月充电数据<span id="month-data-time"></span>
             </div>
             <div class="metric-grid" style="grid-template-columns: repeat(6, 1fr);">
                 <div class="metric-item">
-                    <div class="metric-value" id="month-charge">0 kwh</div>
-                    <div class="metric-label">总充电量</div>
+                    <div class="metric-label">充电量(度)</div>
+                    <div class="metric-value" id="month-charge">0</div>
                 </div>
                 <div class="metric-item">
-                    <div class="metric-value" id="month-electricity">¥0</div>
-                    <div class="metric-label">总电费收入</div>
+                    <div class="metric-label">电费(元)</div>
+                    <div class="metric-value" id="month-electricity">0</div>
                 </div>
                 <div class="metric-item">
-                    <div class="metric-value" id="month-service">¥0</div>
-                    <div class="metric-label">总服务费收入</div>
+                    <div class="metric-label">服务费(元)</div>
+                    <div class="metric-value" id="month-service">0</div>
                 </div>
                 <div class="metric-item">
-                    <div class="metric-value" id="month-income">¥0</div>
-                    <div class="metric-label">综合收入</div>
+                    <div class="metric-label">订单金额(元)</div>
+                    <div class="metric-value" id="month-income">0</div>
                 </div>
                 <div class="metric-item">
+                    <div class="metric-label">订单笔数</div>
                     <div class="metric-value" id="month-orders">0</div>
-                    <div class="metric-label">总订单数量</div>
                 </div>
                 <div class="metric-item">
-                    <div class="metric-value" id="month-duration">0小时</div>
-                    <div class="metric-label">总充电时长</div>
+                    <div class="metric-label">充电时长(小时)</div>
+                    <div class="metric-value" id="month-duration">0</div>
                 </div>
             </div>
         </div>
@@ -3736,32 +3736,32 @@
         <div class="metric-card" style="width: 100%; margin-bottom: 0;">
             <div class="metric-card-title">
                 <i class="fas fa-calendar-alt"></i>
-                本年度充电数据
+                本年度充电数据<span id="year-data-time"></span>
             </div>
             <div class="metric-grid" style="grid-template-columns: repeat(6, 1fr);">
                 <div class="metric-item">
-                    <div class="metric-value" id="year-charge">0 kwh</div>
-                    <div class="metric-label">总充电量</div>
+                    <div class="metric-label">充电量(度)</div>
+                    <div class="metric-value" id="year-charge">0</div>
                 </div>
                 <div class="metric-item">
-                    <div class="metric-value" id="year-electricity">¥0</div>
-                    <div class="metric-label">总电费收入</div>
+                    <div class="metric-label">电费(元)</div>
+                    <div class="metric-value" id="year-electricity">0</div>
                 </div>
                 <div class="metric-item">
-                    <div class="metric-value" id="year-service">¥0</div>
-                    <div class="metric-label">总服务费收入</div>
+                    <div class="metric-label">服务费(元)</div>
+                    <div class="metric-value" id="year-service">0</div>
                 </div>
                 <div class="metric-item">
-                    <div class="metric-value" id="year-income">¥0</div>
-                    <div class="metric-label">综合收入</div>
+                    <div class="metric-label">订单金额(元)</div>
+                    <div class="metric-value" id="year-income">0</div>
                 </div>
                 <div class="metric-item">
+                    <div class="metric-label">订单笔数</div>
                     <div class="metric-value" id="year-orders">0</div>
-                    <div class="metric-label">总订单数量</div>
                 </div>
                 <div class="metric-item">
-                    <div class="metric-value" id="year-duration">0小时</div>
-                    <div class="metric-label">总充电时长</div>
+                    <div class="metric-label">充电时长(小时)</div>
+                    <div class="metric-value" id="year-duration">0</div>
                 </div>
             </div>
         </div>
@@ -3772,32 +3772,32 @@
         <div class="metric-card" style="width: 100%; margin-bottom: 0;">
             <div class="metric-card-title">
                 <i class="fas fa-chart-line"></i>
-                累计充电数据
+                累计充电数据<span id="total-data-time"></span>
             </div>
             <div class="metric-grid" style="grid-template-columns: repeat(6, 1fr);">
                 <div class="metric-item">
-                    <div class="metric-value" id="total-charge">0 kwh</div>
-                    <div class="metric-label">总充电量</div>
+                    <div class="metric-label">充电量(度)</div>
+                    <div class="metric-value" id="total-charge">0</div>
                 </div>
                 <div class="metric-item">
-                    <div class="metric-value" id="total-electricity">¥0</div>
-                    <div class="metric-label">总电费收入</div>
+                    <div class="metric-label">电费(元)</div>
+                    <div class="metric-value" id="total-electricity">0</div>
                 </div>
                 <div class="metric-item">
-                    <div class="metric-value" id="total-service">¥0</div>
-                    <div class="metric-label">总服务费收入</div>
+                    <div class="metric-label">服务费(元)</div>
+                    <div class="metric-value" id="total-service">0</div>
                 </div>
                 <div class="metric-item">
-                    <div class="metric-value" id="total-income">¥0</div>
-                    <div class="metric-label">综合收入</div>
+                    <div class="metric-label">订单金额(元)</div>
+                    <div class="metric-value" id="total-income">0</div>
                 </div>
                 <div class="metric-item">
+                    <div class="metric-label">订单笔数</div>
                     <div class="metric-value" id="total-orders">0</div>
-                    <div class="metric-label">总订单数量</div>
                 </div>
                 <div class="metric-item">
-                    <div class="metric-value" id="total-duration">0小时</div>
-                    <div class="metric-label">总充电时长</div>
+                    <div class="metric-label">充电时长(小时)</div>
+                    <div class="metric-value" id="total-duration">0</div>
                 </div>
             </div>
         </div>
@@ -8496,9 +8496,30 @@
             const hours = now.getHours().toString().padStart(2, '0');
             const minutes = now.getMinutes().toString().padStart(2, '0');
             const seconds = now.getSeconds().toString().padStart(2, '0');
-            
-            document.getElementById('time-display').textContent = 
+
+            document.getElementById('time-display').textContent =
                 `${year}年${month}月${day}日 ${weekday} ${hours}:${minutes}:${seconds}`;
+
+            // 更新今日充电数据的截止时间（上一个整点）
+            const currentHour = now.getHours();
+            const lastHour = currentHour === 0 ? 23 : currentHour - 1;
+            const lastHourStr = lastHour.toString().padStart(2, '0');
+            const todayTimeEl = document.getElementById('today-data-time');
+            if (todayTimeEl) {
+                todayTimeEl.textContent = `(截至今日${lastHourStr}:59)`;
+            }
+            const monthTimeEl = document.getElementById('month-data-time');
+            if (monthTimeEl) {
+                monthTimeEl.textContent = `(截至今日${lastHourStr}:59)`;
+            }
+            const yearTimeEl = document.getElementById('year-data-time');
+            if (yearTimeEl) {
+                yearTimeEl.textContent = `(截至今日${lastHourStr}:59)`;
+            }
+            const totalTimeEl = document.getElementById('total-data-time');
+            if (totalTimeEl) {
+                totalTimeEl.textContent = `(截至今日${lastHourStr}:59)`;
+            }
         }
         
         setInterval(updateTime, 1000);
@@ -9748,32 +9769,35 @@ function initChargingBoardExport() {
 
                     // 更新今日数据
                     if (data.day) {
-                        document.getElementById('day-charge').textContent = formatNumber(data.day.totalElectricity) + ' kwh';
-                        document.getElementById('day-electricity').textContent = '¥' + formatNumber(data.day.totalElectricityFee);
-                        document.getElementById('day-service').textContent = '¥' + formatNumber(data.day.totalServiceFee);
-                        document.getElementById('day-income').textContent = '¥' + formatNumber(data.day.totalIncome);
+                        document.getElementById('day-charge').textContent = formatNumber(data.day.totalElectricity);
+                        document.getElementById('day-electricity').textContent = formatNumber(data.day.totalElectricityFee);
+                        document.getElementById('day-service').textContent = formatNumber(data.day.totalServiceFee);
+                        document.getElementById('day-income').textContent = formatNumber(data.day.totalIncome);
                         document.getElementById('day-orders').textContent = Math.round(data.day.totalCount).toLocaleString();
-                        document.getElementById('day-duration').textContent = formatDuration(data.day.totalDuration);
+                        const dayHours = (data.day.totalDuration / 60).toFixed(2);
+                        document.getElementById('day-duration').textContent = parseFloat(dayHours).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
                     }
 
                     // 更新本月数据
                     if (data.month) {
-                        document.getElementById('month-charge').textContent = formatNumber(data.month.totalElectricity) + ' kwh';
-                        document.getElementById('month-electricity').textContent = '¥' + formatNumber(data.month.totalElectricityFee);
-                        document.getElementById('month-service').textContent = '¥' + formatNumber(data.month.totalServiceFee);
-                        document.getElementById('month-income').textContent = '¥' + formatNumber(data.month.totalIncome);
+                        document.getElementById('month-charge').textContent = formatNumber(data.month.totalElectricity);
+                        document.getElementById('month-electricity').textContent = formatNumber(data.month.totalElectricityFee);
+                        document.getElementById('month-service').textContent = formatNumber(data.month.totalServiceFee);
+                        document.getElementById('month-income').textContent = formatNumber(data.month.totalIncome);
                         document.getElementById('month-orders').textContent = Math.round(data.month.totalCount).toLocaleString();
-                        document.getElementById('month-duration').textContent = formatDuration(data.month.totalDuration);
+                        const monthHours = (data.month.totalDuration / 60).toFixed(2);
+                        document.getElementById('month-duration').textContent = parseFloat(monthHours).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
                     }
 
                     // 更新本年度数据
                     if (data.year) {
-                        document.getElementById('year-charge').textContent = formatNumber(data.year.totalElectricity) + ' kwh';
-                        document.getElementById('year-electricity').textContent = '¥' + formatNumber(data.year.totalElectricityFee);
-                        document.getElementById('year-service').textContent = '¥' + formatNumber(data.year.totalServiceFee);
-                        document.getElementById('year-income').textContent = '¥' + formatNumber(data.year.totalIncome);
+                        document.getElementById('year-charge').textContent = formatNumber(data.year.totalElectricity);
+                        document.getElementById('year-electricity').textContent = formatNumber(data.year.totalElectricityFee);
+                        document.getElementById('year-service').textContent = formatNumber(data.year.totalServiceFee);
+                        document.getElementById('year-income').textContent = formatNumber(data.year.totalIncome);
                         document.getElementById('year-orders').textContent = Math.round(data.year.totalCount).toLocaleString();
-                        document.getElementById('year-duration').textContent = formatDuration(data.year.totalDuration);
+                        const yearHours = (data.year.totalDuration / 60).toFixed(2);
+                        document.getElementById('year-duration').textContent = parseFloat(yearHours).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
                     }
 
                     // 更新累计数据（2026年以前 + 本年度）
@@ -9799,14 +9823,15 @@ function initChargingBoardExport() {
                         };
 
                         // 更新累计数据显示
-                        totalChargeEl.textContent = formatNumber(totalData.totalElectricity) + ' kwh';
-                        totalElectricityEl.textContent = '¥' + formatNumber(totalData.totalElectricityFee);
-                        totalServiceEl.textContent = '¥' + formatNumber(totalData.totalServiceFee);
-                        totalIncomeEl.textContent = '¥' + formatNumber(totalData.totalIncome);
+                        totalChargeEl.textContent = formatNumber(totalData.totalElectricity);
+                        totalElectricityEl.textContent = formatNumber(totalData.totalElectricityFee);
+                        totalServiceEl.textContent = formatNumber(totalData.totalServiceFee);
+                        totalIncomeEl.textContent = formatNumber(totalData.totalIncome);
                         totalOrdersEl.textContent = Math.round(totalData.totalCount).toLocaleString();
 
                         if (totalDurationEl) {
-                            totalDurationEl.textContent = formatDuration(totalData.totalDuration);
+                            const totalHours = (totalData.totalDuration / 60).toFixed(2);
+                            totalDurationEl.textContent = parseFloat(totalHours).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
                         }
 
                         console.log('[loadMetricsData] 累计数据已更新 (历史 + 本年度)');
@@ -10254,6 +10279,11 @@ function drawRealtimeChart() {
                 intersect: false
             },
             scales: {
+                x: {
+                    grid: {
+                        display: false // 取消纵向网格线
+                    }
+                },
                 y: {
                     type: 'linear',
                     display: true,
@@ -10261,6 +10291,14 @@ function drawRealtimeChart() {
                     title: {
                         display: true,
                         text: '充电量 (kwh)'
+                    },
+                    grid: {
+                        display: true,
+                        drawBorder: true,
+                        drawOnChartArea: true,
+                        drawTicks: true,
+                        borderDash: [5, 5], // 横向网格线改为虚线
+                        color: 'rgba(0, 0, 0, 0.1)'
                     },
                     // 移除任何固定的min/max设置，让图表自动调整
                     beginAtZero: true // 从0开始，但会自动扩展
