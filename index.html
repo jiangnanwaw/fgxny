@@ -2143,6 +2143,88 @@
             color: #666;
         }
 
+        /* 今日充电数据板块增强样式 */
+        .metric-card-today {
+            position: relative;
+            border-left: 5px solid transparent;
+            border-image: linear-gradient(180deg, #1a73e8, #4285f4) 1;
+            box-shadow: 0 4px 16px rgba(26, 115, 232, 0.15) !important;
+            transition: all 0.3s ease;
+        }
+
+        .metric-card-today:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 24px rgba(26, 115, 232, 0.25) !important;
+        }
+
+        .metric-card-today .metric-card-title {
+            color: #1a73e8;
+            font-weight: 600;
+            font-size: 17px;
+        }
+
+        .metric-card-today .metric-card-title i {
+            color: #1a73e8;
+            font-size: 18px;
+        }
+
+        /* 增强的指标项样式 */
+        .metric-item-enhanced {
+            background: linear-gradient(135deg, #f8fbff 0%, #ffffff 100%) !important;
+            border: 1px solid rgba(26, 115, 232, 0.1);
+            padding: 12px 8px !important;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .metric-item-enhanced::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, #1a73e8, #4285f4);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .metric-item-enhanced:hover::before {
+            opacity: 1;
+        }
+
+        .metric-item-enhanced:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 8px 20px rgba(26, 115, 232, 0.2);
+            border-color: rgba(26, 115, 232, 0.3);
+        }
+
+        /* 指标图标样式 */
+        .metric-icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+            transition: transform 0.3s;
+        }
+
+        .metric-item-enhanced:hover .metric-icon {
+            transform: scale(1.15) rotate(5deg);
+        }
+
+        .metric-item-enhanced .metric-label {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+
+        .metric-item-enhanced .metric-value {
+            font-size: 22px;
+            font-weight: bold;
+            color: #1a73e8;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
         .chart-container {
             background: transparent;
             border-radius: 12px;
@@ -3661,33 +3743,39 @@
                 <div class="metrics-section" style="gap: 8px;">
     <!-- 日充电数据 - 单独一行 -->
     <div class="metrics-row" style="margin-bottom: 5px;">
-        <div class="metric-card" style="width: 100%; margin-bottom: 0;">
+        <div class="metric-card metric-card-today" style="width: 100%; margin-bottom: 0;">
             <div class="metric-card-title">
                 <i class="fas fa-calendar-day"></i>
                 今日充电数据<span id="today-data-time"></span>
             </div>
             <div class="metric-grid" style="grid-template-columns: repeat(6, 1fr);">
-                <div class="metric-item">
+                <div class="metric-item metric-item-enhanced">
+                    <div class="metric-icon">⚡</div>
                     <div class="metric-label">充电量(度)</div>
                     <div class="metric-value" id="day-charge">0</div>
                 </div>
-                <div class="metric-item">
+                <div class="metric-item metric-item-enhanced">
+                    <div class="metric-icon">💡</div>
                     <div class="metric-label">电费(元)</div>
                     <div class="metric-value" id="day-electricity">0</div>
                 </div>
-                <div class="metric-item">
+                <div class="metric-item metric-item-enhanced">
+                    <div class="metric-icon">🔌</div>
                     <div class="metric-label">服务费(元)</div>
                     <div class="metric-value" id="day-service">0</div>
                 </div>
-                <div class="metric-item">
+                <div class="metric-item metric-item-enhanced">
+                    <div class="metric-icon">💰</div>
                     <div class="metric-label">订单金额(元)</div>
                     <div class="metric-value" id="day-income">0</div>
                 </div>
-                <div class="metric-item">
+                <div class="metric-item metric-item-enhanced">
+                    <div class="metric-icon">📊</div>
                     <div class="metric-label">订单笔数</div>
                     <div class="metric-value" id="day-orders">0</div>
                 </div>
-                <div class="metric-item">
+                <div class="metric-item metric-item-enhanced">
+                    <div class="metric-icon">⏱️</div>
                     <div class="metric-label">充电时长(小时)</div>
                     <div class="metric-value" id="day-duration">0</div>
                 </div>
