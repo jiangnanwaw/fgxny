@@ -685,6 +685,9 @@ app.get('/api/local/realtime-summary', async (req, res) => {
             throw new Error('MySQL连接池未初始化');
         }
 
+        // 获取当前小时（用于昨日同期对比）
+        const currentHour = new Date().getHours();
+
         // 查询锦泰广场站今日数据（从hourly_snapshot汇总）
         const [jintaiDayRows] = await mysqlPool.query(
             `SELECT SUM(total_count) as total_count,
@@ -695,6 +698,34 @@ app.get('/api/local/realtime-summary', async (req, res) => {
                     SUM(total_duration) as total_duration
              FROM jintai_hourly_snapshot
              WHERE station_id = 'jintai_station_001' AND DATE(snapshot_time) = CURDATE()`
+        );
+
+        // 查询锦泰广场站昨日同期数据（截至昨天同一小时）
+        const [jintaiYesterdaySamePeriodRows] = await mysqlPool.query(
+            `SELECT SUM(total_count) as total_count,
+                    SUM(total_electricity) as total_electricity,
+                    SUM(total_electricity_fee) as total_electricity_fee,
+                    SUM(total_service_fee) as total_service_fee,
+                    SUM(total_income) as total_income,
+                    SUM(total_duration) as total_duration
+             FROM jintai_hourly_snapshot
+             WHERE station_id = 'jintai_station_001'
+             AND DATE(snapshot_time) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)
+             AND HOUR(snapshot_time) < ?`,
+            [currentHour]
+        );
+
+        // 查询锦泰广场站昨日全天数据
+        const [jintaiYesterdayFullRows] = await mysqlPool.query(
+            `SELECT SUM(total_count) as total_count,
+                    SUM(total_electricity) as total_electricity,
+                    SUM(total_electricity_fee) as total_electricity_fee,
+                    SUM(total_service_fee) as total_service_fee,
+                    SUM(total_income) as total_income,
+                    SUM(total_duration) as total_duration
+             FROM jintai_hourly_snapshot
+             WHERE station_id = 'jintai_station_001'
+             AND DATE(snapshot_time) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)`
         );
 
         // 查询锦泰广场站月和年数据
@@ -718,6 +749,34 @@ app.get('/api/local/realtime-summary', async (req, res) => {
              WHERE scope = 'all' AND DATE(snapshot_time) = CURDATE()`
         );
 
+        // 查询兴发路站昨日同期数据（截至昨天同一小时）
+        const [xflYesterdaySamePeriodRows] = await mysqlPool.query(
+            `SELECT SUM(order_count) as order_count,
+                    SUM(electricity) as electricity,
+                    SUM(electricity_fee) as electricity_fee,
+                    SUM(service_fee) as service_fee,
+                    SUM(order_amount) as order_amount,
+                    SUM(duration_minutes) as duration_minutes
+             FROM xfl_hourly_snapshot
+             WHERE scope = 'all'
+             AND DATE(snapshot_time) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)
+             AND HOUR(snapshot_time) < ?`,
+            [currentHour]
+        );
+
+        // 查询兴发路站昨日全天数据
+        const [xflYesterdayFullRows] = await mysqlPool.query(
+            `SELECT SUM(order_count) as order_count,
+                    SUM(electricity) as electricity,
+                    SUM(electricity_fee) as electricity_fee,
+                    SUM(service_fee) as service_fee,
+                    SUM(order_amount) as order_amount,
+                    SUM(duration_minutes) as duration_minutes
+             FROM xfl_hourly_snapshot
+             WHERE scope = 'all'
+             AND DATE(snapshot_time) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)`
+        );
+
         // 查询兴发路站月和年数据
         const [xflRows] = await mysqlPool.query(
             `SELECT granularity, order_count, electricity, electricity_fee,
@@ -739,6 +798,30 @@ app.get('/api/local/realtime-summary', async (req, res) => {
                 totalServiceFee: parseFloat(jintaiDayRows[0].total_service_fee) || 0,
                 totalIncome: parseFloat(jintaiDayRows[0].total_income) || 0,
                 totalDuration: parseInt(jintaiDayRows[0].total_duration) || 0
+            };
+        }
+
+        // 昨日同期数据
+        if (jintaiYesterdaySamePeriodRows.length > 0 && jintaiYesterdaySamePeriodRows[0].total_count !== null) {
+            jintaiData.yesterdaySamePeriod = {
+                totalCount: parseInt(jintaiYesterdaySamePeriodRows[0].total_count) || 0,
+                totalElectricity: parseFloat(jintaiYesterdaySamePeriodRows[0].total_electricity) || 0,
+                totalElectricityFee: parseFloat(jintaiYesterdaySamePeriodRows[0].total_electricity_fee) || 0,
+                totalServiceFee: parseFloat(jintaiYesterdaySamePeriodRows[0].total_service_fee) || 0,
+                totalIncome: parseFloat(jintaiYesterdaySamePeriodRows[0].total_income) || 0,
+                totalDuration: parseInt(jintaiYesterdaySamePeriodRows[0].total_duration) || 0
+            };
+        }
+
+        // 昨日全天数据
+        if (jintaiYesterdayFullRows.length > 0 && jintaiYesterdayFullRows[0].total_count !== null) {
+            jintaiData.yesterdayFull = {
+                totalCount: parseInt(jintaiYesterdayFullRows[0].total_count) || 0,
+                totalElectricity: parseFloat(jintaiYesterdayFullRows[0].total_electricity) || 0,
+                totalElectricityFee: parseFloat(jintaiYesterdayFullRows[0].total_electricity_fee) || 0,
+                totalServiceFee: parseFloat(jintaiYesterdayFullRows[0].total_service_fee) || 0,
+                totalIncome: parseFloat(jintaiYesterdayFullRows[0].total_income) || 0,
+                totalDuration: parseInt(jintaiYesterdayFullRows[0].total_duration) || 0
             };
         }
 
@@ -769,6 +852,30 @@ app.get('/api/local/realtime-summary', async (req, res) => {
             };
         }
 
+        // 昨日同期数据
+        if (xflYesterdaySamePeriodRows.length > 0 && xflYesterdaySamePeriodRows[0].order_count !== null) {
+            xflData.yesterdaySamePeriod = {
+                totalCount: parseInt(xflYesterdaySamePeriodRows[0].order_count) || 0,
+                totalElectricity: parseFloat(xflYesterdaySamePeriodRows[0].electricity) || 0,
+                totalElectricityFee: parseFloat(xflYesterdaySamePeriodRows[0].electricity_fee) || 0,
+                totalServiceFee: parseFloat(xflYesterdaySamePeriodRows[0].service_fee) || 0,
+                totalIncome: parseFloat(xflYesterdaySamePeriodRows[0].order_amount) || 0,
+                totalDuration: parseInt(xflYesterdaySamePeriodRows[0].duration_minutes) || 0
+            };
+        }
+
+        // 昨日全天数据
+        if (xflYesterdayFullRows.length > 0 && xflYesterdayFullRows[0].order_count !== null) {
+            xflData.yesterdayFull = {
+                totalCount: parseInt(xflYesterdayFullRows[0].order_count) || 0,
+                totalElectricity: parseFloat(xflYesterdayFullRows[0].electricity) || 0,
+                totalElectricityFee: parseFloat(xflYesterdayFullRows[0].electricity_fee) || 0,
+                totalServiceFee: parseFloat(xflYesterdayFullRows[0].service_fee) || 0,
+                totalIncome: parseFloat(xflYesterdayFullRows[0].order_amount) || 0,
+                totalDuration: parseInt(xflYesterdayFullRows[0].duration_minutes) || 0
+            };
+        }
+
         // 月和年数据
         xflRows.forEach(row => {
             const durationMinutes = parseDurationText(row.duration_text);
@@ -788,6 +895,8 @@ app.get('/api/local/realtime-summary', async (req, res) => {
             // 只返回锦泰广场站数据
             result = {
                 day: jintaiData.day || { totalCount: 0, totalElectricity: 0, totalElectricityFee: 0, totalServiceFee: 0, totalIncome: 0, totalDuration: 0 },
+                yesterdaySamePeriod: jintaiData.yesterdaySamePeriod || { totalCount: 0, totalElectricity: 0, totalElectricityFee: 0, totalServiceFee: 0, totalIncome: 0, totalDuration: 0 },
+                yesterdayFull: jintaiData.yesterdayFull || { totalCount: 0, totalElectricity: 0, totalElectricityFee: 0, totalServiceFee: 0, totalIncome: 0, totalDuration: 0 },
                 month: jintaiData.month || { totalCount: 0, totalElectricity: 0, totalElectricityFee: 0, totalServiceFee: 0, totalIncome: 0, totalDuration: 0 },
                 year: jintaiData.year || { totalCount: 0, totalElectricity: 0, totalElectricityFee: 0, totalServiceFee: 0, totalIncome: 0, totalDuration: 0 }
             };
@@ -795,6 +904,8 @@ app.get('/api/local/realtime-summary', async (req, res) => {
             // 只返回兴发路站数据
             result = {
                 day: xflData.day || { totalCount: 0, totalElectricity: 0, totalElectricityFee: 0, totalServiceFee: 0, totalIncome: 0, totalDuration: 0 },
+                yesterdaySamePeriod: xflData.yesterdaySamePeriod || { totalCount: 0, totalElectricity: 0, totalElectricityFee: 0, totalServiceFee: 0, totalIncome: 0, totalDuration: 0 },
+                yesterdayFull: xflData.yesterdayFull || { totalCount: 0, totalElectricity: 0, totalElectricityFee: 0, totalServiceFee: 0, totalIncome: 0, totalDuration: 0 },
                 month: xflData.month || { totalCount: 0, totalElectricity: 0, totalElectricityFee: 0, totalServiceFee: 0, totalIncome: 0, totalDuration: 0 },
                 year: xflData.year || { totalCount: 0, totalElectricity: 0, totalElectricityFee: 0, totalServiceFee: 0, totalIncome: 0, totalDuration: 0 }
             };
@@ -808,6 +919,22 @@ app.get('/api/local/realtime-summary', async (req, res) => {
                     totalServiceFee: (jintaiData.day?.totalServiceFee || 0) + (xflData.day?.totalServiceFee || 0),
                     totalIncome: (jintaiData.day?.totalIncome || 0) + (xflData.day?.totalIncome || 0),
                     totalDuration: (jintaiData.day?.totalDuration || 0) + (xflData.day?.totalDuration || 0)
+                },
+                yesterdaySamePeriod: {
+                    totalCount: (jintaiData.yesterdaySamePeriod?.totalCount || 0) + (xflData.yesterdaySamePeriod?.totalCount || 0),
+                    totalElectricity: (jintaiData.yesterdaySamePeriod?.totalElectricity || 0) + (xflData.yesterdaySamePeriod?.totalElectricity || 0),
+                    totalElectricityFee: (jintaiData.yesterdaySamePeriod?.totalElectricityFee || 0) + (xflData.yesterdaySamePeriod?.totalElectricityFee || 0),
+                    totalServiceFee: (jintaiData.yesterdaySamePeriod?.totalServiceFee || 0) + (xflData.yesterdaySamePeriod?.totalServiceFee || 0),
+                    totalIncome: (jintaiData.yesterdaySamePeriod?.totalIncome || 0) + (xflData.yesterdaySamePeriod?.totalIncome || 0),
+                    totalDuration: (jintaiData.yesterdaySamePeriod?.totalDuration || 0) + (xflData.yesterdaySamePeriod?.totalDuration || 0)
+                },
+                yesterdayFull: {
+                    totalCount: (jintaiData.yesterdayFull?.totalCount || 0) + (xflData.yesterdayFull?.totalCount || 0),
+                    totalElectricity: (jintaiData.yesterdayFull?.totalElectricity || 0) + (xflData.yesterdayFull?.totalElectricity || 0),
+                    totalElectricityFee: (jintaiData.yesterdayFull?.totalElectricityFee || 0) + (xflData.yesterdayFull?.totalElectricityFee || 0),
+                    totalServiceFee: (jintaiData.yesterdayFull?.totalServiceFee || 0) + (xflData.yesterdayFull?.totalServiceFee || 0),
+                    totalIncome: (jintaiData.yesterdayFull?.totalIncome || 0) + (xflData.yesterdayFull?.totalIncome || 0),
+                    totalDuration: (jintaiData.yesterdayFull?.totalDuration || 0) + (xflData.yesterdayFull?.totalDuration || 0)
                 },
                 month: {
                     totalCount: (jintaiData.month?.totalCount || 0) + (xflData.month?.totalCount || 0),

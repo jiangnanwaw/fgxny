@@ -2225,6 +2225,44 @@
             text-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
 
+        /* 对比信息样式 */
+        .metric-compare {
+            font-size: 11px;
+            margin-top: 4px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+        }
+
+        .metric-compare.positive {
+            color: #0f9d58;
+        }
+
+        .metric-compare.negative {
+            color: #d93025;
+        }
+
+        .metric-compare.neutral {
+            color: #999;
+        }
+
+        .metric-compare .arrow {
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        /* 昨日参考信息样式 */
+        .yesterday-reference {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
         .chart-container {
             background: transparent;
             border-radius: 12px;
@@ -3753,33 +3791,40 @@
                     <div class="metric-icon">⚡</div>
                     <div class="metric-label">充电量(度)</div>
                     <div class="metric-value" id="day-charge">0</div>
+                    <div class="metric-compare" id="day-charge-compare"></div>
                 </div>
                 <div class="metric-item metric-item-enhanced">
                     <div class="metric-icon">💡</div>
                     <div class="metric-label">电费(元)</div>
                     <div class="metric-value" id="day-electricity">0</div>
+                    <div class="metric-compare" id="day-electricity-compare"></div>
                 </div>
                 <div class="metric-item metric-item-enhanced">
                     <div class="metric-icon">🔌</div>
                     <div class="metric-label">服务费(元)</div>
                     <div class="metric-value" id="day-service">0</div>
+                    <div class="metric-compare" id="day-service-compare"></div>
                 </div>
                 <div class="metric-item metric-item-enhanced">
                     <div class="metric-icon">💰</div>
                     <div class="metric-label">订单金额(元)</div>
                     <div class="metric-value" id="day-income">0</div>
+                    <div class="metric-compare" id="day-income-compare"></div>
                 </div>
                 <div class="metric-item metric-item-enhanced">
                     <div class="metric-icon">📊</div>
                     <div class="metric-label">订单笔数</div>
                     <div class="metric-value" id="day-orders">0</div>
+                    <div class="metric-compare" id="day-orders-compare"></div>
                 </div>
                 <div class="metric-item metric-item-enhanced">
                     <div class="metric-icon">⏱️</div>
                     <div class="metric-label">充电时长(小时)</div>
                     <div class="metric-value" id="day-duration">0</div>
+                    <div class="metric-compare" id="day-duration-compare"></div>
                 </div>
             </div>
+            <div class="yesterday-reference" id="yesterday-reference" style="margin-top: 10px; padding: 8px; background: rgba(26, 115, 232, 0.08); border-radius: 6px; font-size: 12px; color: #555; text-align: center; border: 1px solid rgba(26, 115, 232, 0.15);"></div>
         </div>
     </div>
     <!-- 本月充电数据 - 单独一行 -->
@@ -9855,6 +9900,43 @@ function initChargingBoardExport() {
                         return parseFloat(hours).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '小时';
                     }
 
+                    // 计算并显示对比信息
+                    function updateCompareInfo(elementId, todayValue, yesterdayValue, isInteger = false) {
+                        const compareEl = document.getElementById(elementId + '-compare');
+                        if (!compareEl) return;
+
+                        if (!yesterdayValue || yesterdayValue === 0) {
+                            compareEl.innerHTML = '<span class="neutral">暂无对比</span>';
+                            return;
+                        }
+
+                        const diff = todayValue - yesterdayValue;
+                        const percentChange = ((diff / yesterdayValue) * 100).toFixed(1);
+                        const absDiff = Math.abs(diff);
+
+                        let arrow = '';
+                        let className = '';
+                        let sign = '';
+
+                        if (diff > 0) {
+                            arrow = '↑';
+                            className = 'positive';
+                            sign = '+';
+                        } else if (diff < 0) {
+                            arrow = '↓';
+                            className = 'negative';
+                            sign = '';
+                        } else {
+                            arrow = '→';
+                            className = 'neutral';
+                            sign = '';
+                        }
+
+                        const formattedDiff = isInteger ? Math.round(absDiff).toLocaleString() : absDiff.toFixed(2);
+                        compareEl.className = `metric-compare ${className}`;
+                        compareEl.innerHTML = `<span class="arrow">${arrow}</span> ${sign}${Math.abs(parseFloat(percentChange))}% (${sign}${formattedDiff})`;
+                    }
+
                     // 更新今日数据
                     if (data.day) {
                         document.getElementById('day-charge').textContent = formatNumber(data.day.totalElectricity);
@@ -9864,6 +9946,28 @@ function initChargingBoardExport() {
                         document.getElementById('day-orders').textContent = Math.round(data.day.totalCount).toLocaleString();
                         const dayHours = (data.day.totalDuration / 60).toFixed(2);
                         document.getElementById('day-duration').textContent = parseFloat(dayHours).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+                        // 更新对比信息（与昨日同期对比）
+                        if (data.yesterdaySamePeriod) {
+                            updateCompareInfo('day-charge', data.day.totalElectricity, data.yesterdaySamePeriod.totalElectricity);
+                            updateCompareInfo('day-electricity', data.day.totalElectricityFee, data.yesterdaySamePeriod.totalElectricityFee);
+                            updateCompareInfo('day-service', data.day.totalServiceFee, data.yesterdaySamePeriod.totalServiceFee);
+                            updateCompareInfo('day-income', data.day.totalIncome, data.yesterdaySamePeriod.totalIncome);
+                            updateCompareInfo('day-orders', data.day.totalCount, data.yesterdaySamePeriod.totalCount, true);
+                            updateCompareInfo('day-duration', data.day.totalDuration / 60, data.yesterdaySamePeriod.totalDuration / 60);
+                        }
+
+                        // 更新昨日全天参考信息
+                        if (data.yesterdayFull) {
+                            const refEl = document.getElementById('yesterday-reference');
+                            if (refEl) {
+                                const yCharge = formatNumber(data.yesterdayFull.totalElectricity);
+                                const yOrders = Math.round(data.yesterdayFull.totalCount).toLocaleString();
+                                const yIncome = formatNumber(data.yesterdayFull.totalIncome);
+                                const yHours = (data.yesterdayFull.totalDuration / 60).toFixed(2);
+                                refEl.innerHTML = `📊 昨日全天数据参考：充电量 ${yCharge}度 | 订单 ${yOrders}笔 | 金额 ${yIncome}元 | 时长 ${yHours}小时`;
+                            }
+                        }
                     }
 
                     // 更新本月数据
