@@ -711,7 +711,7 @@ app.get('/api/local/realtime-summary', async (req, res) => {
              FROM jintai_hourly_snapshot
              WHERE station_id = 'jintai_station_001'
              AND DATE(snapshot_time) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)
-             AND HOUR(snapshot_time) < ?`,
+             AND HOUR(snapshot_time) <= ?`,
             [currentHour]
         );
 
@@ -760,7 +760,7 @@ app.get('/api/local/realtime-summary', async (req, res) => {
              FROM xfl_hourly_snapshot
              WHERE scope = 'all'
              AND DATE(snapshot_time) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)
-             AND HOUR(snapshot_time) < ?`,
+             AND HOUR(snapshot_time) <= ?`,
             [currentHour]
         );
 
