@@ -685,8 +685,9 @@ app.get('/api/local/realtime-summary', async (req, res) => {
             throw new Error('MySQL连接池未初始化');
         }
 
-        // 获取当前小时（用于昨日同期对比）
-        const currentHour = new Date().getHours();
+        // 获取当前小时（使用数据库时区，确保本地和Render一致）
+        const [currentHourResult] = await mysqlPool.query('SELECT HOUR(NOW()) as current_hour');
+        const currentHour = currentHourResult[0].current_hour;
 
         // 查询锦泰广场站今日数据（从hourly_snapshot汇总）
         const [jintaiDayRows] = await mysqlPool.query(
