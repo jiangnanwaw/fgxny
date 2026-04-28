@@ -716,17 +716,17 @@ app.get('/api/local/realtime-summary', async (req, res) => {
             [currentHour]
         );
 
-        // 查询锦泰广场站昨日全天数据
+        // 查询锦泰广场站昨日全天数据（从历史汇总表查询，确保与本月日充电数据一致）
         const [jintaiYesterdayFullRows] = await mysqlPool.query(
-            `SELECT SUM(total_count) as total_count,
-                    SUM(total_electricity) as total_electricity,
-                    SUM(total_electricity_fee) as total_electricity_fee,
-                    SUM(total_service_fee) as total_service_fee,
-                    SUM(total_income) as total_income,
-                    SUM(total_duration) as total_duration
-             FROM jintai_hourly_snapshot
+            `SELECT total_count,
+                    total_electricity,
+                    total_electricity_fee,
+                    total_service_fee,
+                    total_income,
+                    total_duration
+             FROM jintai_history_summary
              WHERE station_id = 'jintai_station_001'
-             AND DATE(snapshot_time) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)`
+             AND date = DATE_SUB(CURDATE(), INTERVAL 1 DAY)`
         );
 
         // 查询锦泰广场站月和年数据
@@ -765,17 +765,17 @@ app.get('/api/local/realtime-summary', async (req, res) => {
             [currentHour]
         );
 
-        // 查询兴发路站昨日全天数据
+        // 查询兴发路站昨日全天数据（从历史汇总表查询，确保与本月日充电数据一致）
         const [xflYesterdayFullRows] = await mysqlPool.query(
-            `SELECT SUM(order_count) as order_count,
-                    SUM(electricity) as electricity,
-                    SUM(electricity_fee) as electricity_fee,
-                    SUM(service_fee) as service_fee,
-                    SUM(order_amount) as order_amount,
-                    SUM(duration_minutes) as duration_minutes
-             FROM xfl_hourly_snapshot
+            `SELECT order_count,
+                    electricity,
+                    electricity_fee,
+                    service_fee,
+                    order_amount,
+                    duration_text
+             FROM xfl_history_summary
              WHERE scope = 'all'
-             AND DATE(snapshot_time) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)`
+             AND date = DATE_SUB(CURDATE(), INTERVAL 1 DAY)`
         );
 
         // 查询兴发路站月和年数据
@@ -873,7 +873,7 @@ app.get('/api/local/realtime-summary', async (req, res) => {
                 totalElectricityFee: parseFloat(xflYesterdayFullRows[0].electricity_fee) || 0,
                 totalServiceFee: parseFloat(xflYesterdayFullRows[0].service_fee) || 0,
                 totalIncome: parseFloat(xflYesterdayFullRows[0].order_amount) || 0,
-                totalDuration: parseInt(xflYesterdayFullRows[0].duration_minutes) || 0
+                totalDuration: parseDurationText(xflYesterdayFullRows[0].duration_text)
             };
         }
 
