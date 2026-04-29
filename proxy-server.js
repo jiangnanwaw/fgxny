@@ -685,11 +685,13 @@ app.get('/api/local/realtime-summary', async (req, res) => {
             throw new Error('MySQL连接池未初始化');
         }
 
-        // 获取当前小时（使用数据库时区，确保本地和Render一致）
-        const [currentHourResult] = await mysqlPool.query('SELECT HOUR(NOW()) as current_hour');
+        // 获取当前小时（使用北京时区 UTC+8）
+        const [currentHourResult] = await mysqlPool.query(
+            `SELECT HOUR(CONVERT_TZ(NOW(), @@session.time_zone, '+08:00')) as current_hour`
+        );
         const currentHour = currentHourResult[0].current_hour;
 
-        // 查询锦泰广场站今日数据（从hourly_snapshot汇总）
+        // 查询锦泰广场站今日数据（从hourly_snapshot汇总，使用北京时区）
         const [jintaiDayRows] = await mysqlPool.query(
             `SELECT SUM(total_count) as total_count,
                     SUM(total_electricity) as total_electricity,
@@ -698,10 +700,11 @@ app.get('/api/local/realtime-summary', async (req, res) => {
                     SUM(total_income) as total_income,
                     SUM(total_duration) as total_duration
              FROM jintai_hourly_snapshot
-             WHERE station_id = 'jintai_station_001' AND DATE(snapshot_time) = CURDATE()`
+             WHERE station_id = 'jintai_station_001'
+             AND DATE(snapshot_time) = DATE(CONVERT_TZ(NOW(), @@session.time_zone, '+08:00'))`
         );
 
-        // 查询锦泰广场站昨日同期数据（截至昨天同一小时）
+        // 查询锦泰广场站昨日同期数据（截至昨天同一小时，使用北京时区）
         const [jintaiYesterdaySamePeriodRows] = await mysqlPool.query(
             `SELECT SUM(total_count) as total_count,
                     SUM(total_electricity) as total_electricity,
@@ -711,12 +714,12 @@ app.get('/api/local/realtime-summary', async (req, res) => {
                     SUM(total_duration) as total_duration
              FROM jintai_hourly_snapshot
              WHERE station_id = 'jintai_station_001'
-             AND DATE(snapshot_time) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)
+             AND DATE(snapshot_time) = DATE_SUB(DATE(CONVERT_TZ(NOW(), @@session.time_zone, '+08:00')), INTERVAL 1 DAY)
              AND HOUR(snapshot_time) < ?`,
             [currentHour]
         );
 
-        // 查询锦泰广场站昨日全天数据（从历史汇总表查询，确保与本月日充电数据一致）
+        // 查询锦泰广场站昨日全天数据（从历史汇总表查询，确保与本月日充电数据一致，使用北京时区）
         const [jintaiYesterdayFullRows] = await mysqlPool.query(
             `SELECT total_count,
                     total_electricity,
@@ -726,7 +729,7 @@ app.get('/api/local/realtime-summary', async (req, res) => {
                     total_duration
              FROM jintai_history_summary
              WHERE station_id = 'jintai_station_001'
-             AND date = DATE_SUB(CURDATE(), INTERVAL 1 DAY)`
+             AND date = DATE_SUB(DATE(CONVERT_TZ(NOW(), @@session.time_zone, '+08:00')), INTERVAL 1 DAY)`
         );
 
         // 查询锦泰广场站月和年数据
@@ -738,7 +741,7 @@ app.get('/api/local/realtime-summary', async (req, res) => {
              ORDER BY granularity`
         );
 
-        // 查询兴发路站今日数据（从hourly_snapshot汇总）
+        // 查询兴发路站今日数据（从hourly_snapshot汇总，使用北京时区）
         const [xflDayRows] = await mysqlPool.query(
             `SELECT SUM(order_count) as order_count,
                     SUM(electricity) as electricity,
@@ -747,10 +750,10 @@ app.get('/api/local/realtime-summary', async (req, res) => {
                     SUM(order_amount) as order_amount,
                     SUM(duration_minutes) as duration_minutes
              FROM xfl_hourly_snapshot
-             WHERE scope = 'all' AND DATE(snapshot_time) = CURDATE()`
+             WHERE scope = 'all' AND DATE(snapshot_time) = DATE(CONVERT_TZ(NOW(), @@session.time_zone, '+08:00'))`
         );
 
-        // 查询兴发路站昨日同期数据（截至昨天同一小时）
+        // 查询兴发路站昨日同期数据（截至昨天同一小时，使用北京时区）
         const [xflYesterdaySamePeriodRows] = await mysqlPool.query(
             `SELECT SUM(order_count) as order_count,
                     SUM(electricity) as electricity,
@@ -760,12 +763,12 @@ app.get('/api/local/realtime-summary', async (req, res) => {
                     SUM(duration_minutes) as duration_minutes
              FROM xfl_hourly_snapshot
              WHERE scope = 'all'
-             AND DATE(snapshot_time) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)
+             AND DATE(snapshot_time) = DATE_SUB(DATE(CONVERT_TZ(NOW(), @@session.time_zone, '+08:00')), INTERVAL 1 DAY)
              AND HOUR(snapshot_time) < ?`,
             [currentHour]
         );
 
-        // 查询兴发路站昨日全天数据（从历史汇总表查询，确保与本月日充电数据一致）
+        // 查询兴发路站昨日全天数据（从历史汇总表查询，确保与本月日充电数据一致，使用北京时区）
         const [xflYesterdayFullRows] = await mysqlPool.query(
             `SELECT order_count,
                     electricity,
@@ -775,7 +778,7 @@ app.get('/api/local/realtime-summary', async (req, res) => {
                     duration_text
              FROM xfl_history_summary
              WHERE scope = 'all'
-             AND date = DATE_SUB(CURDATE(), INTERVAL 1 DAY)`
+             AND date = DATE_SUB(DATE(CONVERT_TZ(NOW(), @@session.time_zone, '+08:00')), INTERVAL 1 DAY)`
         );
 
         // 查询兴发路站月和年数据
@@ -1101,13 +1104,13 @@ app.get('/api/local/uncharged-terminals', async (req, res) => {
             await initializeMySQLPool();
         }
 
-        // SQL查询：合并兴发路站和锦泰广场站的数据
+        // SQL查询：合并兴发路站和锦泰广场站的数据（使用北京时区）
         const query = `
             SELECT
                 station_name AS stationName,
                 gun_id AS terminalName,
                 MAX(charge_end_time) AS lastEndTime,
-                NOW() AS currentTime
+                CONVERT_TZ(NOW(), @@session.time_zone, '+08:00') AS currentTime
             FROM xingfa_order_detail_3days
             WHERE charge_end_time IS NOT NULL
             GROUP BY station_name, gun_id
@@ -1118,7 +1121,7 @@ app.get('/api/local/uncharged-terminals', async (req, res) => {
                 station_name AS stationName,
                 terminal_name AS terminalName,
                 last_charge_end_time AS lastEndTime,
-                NOW() AS currentTime
+                CONVERT_TZ(NOW(), @@session.time_zone, '+08:00') AS currentTime
             FROM jintai_terminal_last_charge
             WHERE last_charge_end_time IS NOT NULL
 

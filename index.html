@@ -12475,12 +12475,13 @@ function updateUnchargedTable() {
             try {
                 behaviorData = [];
 
-                // 获取最近30天的日期
-                const today = new Date();
+                // 获取最近30天的日期（使用北京时间）
+                const now = new Date();
+                const beijingTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + (8 * 3600000));
                 const dates = [];
                 for (let i = 29; i >= 0; i--) {
-                    const date = new Date(today);
-                    date.setDate(today.getDate() - i);
+                    const date = new Date(beijingTime);
+                    date.setDate(beijingTime.getDate() - i);
                     dates.push(date.toISOString().split('T')[0]);
                 }
 
