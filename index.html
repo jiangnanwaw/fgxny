@@ -1421,45 +1421,68 @@
                 margin-left: 0;
                 flex-direction: column;
             }
-            
+
             .sidebar {
-                position: relative;
-                width: 100%;
-                height: auto;
-                top: 0;
-                order: 2;
-                display: none; /* 默认隐藏 */
+                position: fixed;
+                left: -280px; /* 默认隐藏在左侧外 */
+                top: 60px;
+                width: 280px;
+                height: calc(100vh - 60px);
+                overflow-y: auto;
+                background: white;
+                z-index: 1100;
+                transition: left 0.3s ease-in-out;
+                box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
             }
-            
+
             .sidebar.mobile-open {
-                display: block;
+                left: 0; /* 滑入到可见位置 */
             }
-            
+
+            /* 移动端遮罩层 */
+            .mobile-overlay {
+                display: none;
+                position: fixed;
+                top: 60px;
+                left: 0;
+                width: 100%;
+                height: calc(100vh - 60px);
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 1050;
+                opacity: 0;
+                transition: opacity 0.3s ease-in-out;
+            }
+
+            .mobile-overlay.active {
+                display: block;
+                opacity: 1;
+            }
+
             /* 移动端空白页调整 */
             #page-cd-data, #page-zh-data, #page-bill-data, #page-user-data, #page-other-data, #page-report-charging, #page-report-comprehensive, #page-report-user, #page-report-efficiency, #page-report-bi, #page-ai-model {
                 left: 0 !important;
                 top: 60px !important;
             }
-            
+
             .main-content {
                 order: 1;
                 width: 100%;
             }
-            
+
             #main-container {
                 padding-top: 60px;
             }
-            
+
             header {
                 height: 60px;
                 padding: 10px 15px;
-                position: relative;
+                position: fixed;
             }
-            
+
             .logo h1 {
                 font-size: 18px;
             }
-            
+
             .mobile-menu-toggle {
                 display: block;
                 background: none;
@@ -1468,6 +1491,7 @@
                 font-size: 20px;
                 cursor: pointer;
                 padding: 5px;
+                z-index: 1;
             }
             
             .query-form {
@@ -1577,20 +1601,33 @@
                 width: 95%;
                 margin: 10px;
             }
-            
+
             .form-container {
                 padding: 20px 15px;
             }
-            
+
             header {
                 padding: 8px 10px;
                 height: 50px;
             }
-            
+
             #main-container {
                 padding-top: 50px;
             }
-            
+
+            /* 小屏幕手机侧边栏调整 */
+            .sidebar {
+                top: 50px;
+                height: calc(100vh - 50px);
+                width: 260px;
+                left: -260px;
+            }
+
+            .mobile-overlay {
+                top: 50px;
+                height: calc(100vh - 50px);
+            }
+
             .main-content {
                 padding: 10px;
             }
@@ -2721,7 +2758,10 @@
                 2025年08月05日 星期二 10:30:45
             </div>
         </header>
-        
+
+        <!-- 移动端遮罩层 -->
+        <div class="mobile-overlay" id="mobile-overlay"></div>
+
         <div class="layout">
             <!-- 左侧菜单 -->
             <div class="sidebar">
@@ -6175,20 +6215,39 @@
         function initMobileMenu() {
             const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
             const sidebar = document.querySelector('.sidebar');
-            
+            const overlay = document.getElementById('mobile-overlay');
+
             if (mobileMenuToggle && sidebar) {
+                // 点击菜单按钮切换菜单显示
                 mobileMenuToggle.addEventListener('click', function() {
                     sidebar.classList.toggle('mobile-open');
+                    if (overlay) {
+                        overlay.classList.toggle('active');
+                    }
                 });
-                
-                // 点击主内容区域时关闭菜单
-                const mainContent = document.querySelector('.main-content');
-                if (mainContent) {
-                    mainContent.addEventListener('click', function() {
+
+                // 点击遮罩层关闭菜单
+                if (overlay) {
+                    overlay.addEventListener('click', function() {
                         sidebar.classList.remove('mobile-open');
+                        overlay.classList.remove('active');
                     });
                 }
-                
+
+                // 点击菜单项后关闭菜单（可选，提升用户体验）
+                const menuItems = sidebar.querySelectorAll('.menu-item, .submenu-item');
+                menuItems.forEach(item => {
+                    item.addEventListener('click', function() {
+                        // 延迟关闭，让点击事件先执行
+                        setTimeout(() => {
+                            sidebar.classList.remove('mobile-open');
+                            if (overlay) {
+                                overlay.classList.remove('active');
+                            }
+                        }, 200);
+                    });
+                });
+
                 // 监听窗口尺寸变化，自动显示/隐藏移动端菜单按钮
                 function checkMobileView() {
                     if (window.innerWidth <= 900) {
@@ -6196,12 +6255,15 @@
                     } else {
                         mobileMenuToggle.style.display = 'none';
                         sidebar.classList.remove('mobile-open');
+                        if (overlay) {
+                            overlay.classList.remove('active');
+                        }
                     }
                 }
-                
+
                 // 初始检查
                 checkMobileView();
-                
+
                 // 监听窗口尺寸变化
                 window.addEventListener('resize', checkMobileView);
             }
