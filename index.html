@@ -1530,8 +1530,23 @@
                 min-width: 120px;
                 flex: 1;
             }
+
+            /* 用户充电行为分析 - 平板端优化 */
+            .electricity-analysis-container {
+                flex-direction: column !important;
+            }
+
+            .electricity-pie-charts {
+                flex-direction: row !important;
+                justify-content: space-around !important;
+            }
+
+            /* 经营效率分析 - 平板端优化 */
+            .efficiency-analysis-container {
+                flex-direction: column !important;
+            }
         }
-        
+
         @media (max-width: 768px) {
             .metric-grid {
                 grid-template-columns: 1fr;
@@ -1677,6 +1692,91 @@
             
             .chart-wrapper {
                 height: 250px;
+            }
+
+            /* 用户充电行为分析 - 手机端优化 */
+            .electricity-analysis-container {
+                flex-direction: column !important;
+                gap: 15px !important;
+            }
+
+            .electricity-analysis-table {
+                width: 100% !important;
+            }
+
+            .electricity-pie-charts {
+                width: 100% !important;
+                flex-direction: column !important;
+                gap: 20px !important;
+            }
+
+            .electricity-pie-chart-sfp,
+            .electricity-pie-chart-gl {
+                width: 100% !important;
+            }
+
+            .electricity-pie-chart-sfp > div:first-child,
+            .electricity-pie-chart-gl > div:first-child {
+                height: 180px !important;
+                width: 180px !important;
+            }
+
+            .electricity-numbers-sfp > div,
+            .electricity-numbers-gl > div {
+                flex-wrap: wrap !important;
+                justify-content: center !important;
+                gap: 8px !important;
+            }
+
+            /* 经营效率分析 - 手机端优化 */
+            .efficiency-analysis-container {
+                flex-direction: column !important;
+                gap: 15px !important;
+            }
+
+            .efficiency-table-container {
+                width: 100% !important;
+                margin-bottom: 20px;
+            }
+
+            .efficiency-chart-container {
+                width: 100% !important;
+                margin-top: 0 !important;
+            }
+
+            .efficiency-chart-container > div {
+                height: 300px !important;
+                margin-top: 0 !important;
+            }
+
+            #efficiency-table th,
+            #efficiency-table td {
+                padding: 8px 4px !important;
+                font-size: 11px !important;
+            }
+
+            /* 用户充电行为分析图表控制按钮优化 */
+            #prev-data-btn,
+            #next-data-btn,
+            #current-data-display {
+                padding: 6px 10px !important;
+                font-size: 11px !important;
+            }
+
+            #current-data-display {
+                min-width: 80px !important;
+            }
+
+            /* 经营效率分析翻页控件优化 */
+            #efficiency-prev-data-btn,
+            #efficiency-next-data-btn,
+            #efficiency-current-data-display {
+                padding: 6px 10px !important;
+                font-size: 11px !important;
+            }
+
+            #efficiency-current-data-display {
+                min-width: 70px !important;
             }
         }
         /* 移动端日期选择器优化 */
@@ -4248,7 +4348,7 @@
         </div>
         
         <!-- 经营效率分析内容 -->
-        <div style="display: flex; gap: 20px; margin-top: 0px;">
+        <div class="efficiency-analysis-container" style="display: flex; gap: 20px; margin-top: 0px;">
             <!-- 经营效率分析表格 -->
             <div class="efficiency-table-container" style="flex: 1; position: relative;">
                 <!-- 翻页控件 -->
